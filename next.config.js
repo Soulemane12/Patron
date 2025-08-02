@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  swcMinify: true,
   reactStrictMode: true,
+  experimental: {
+    TypedRoutes: true,
+  },
 };
 
 module.exports = nextConfig;
