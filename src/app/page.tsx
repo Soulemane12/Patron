@@ -22,6 +22,8 @@ export default function Home() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [testEmailStatus, setTestEmailStatus] = useState('');
 
   // Calculate email notification dates
   const getEmailSchedule = (installationDate: string) => {
@@ -37,6 +39,44 @@ export default function Home() {
       dayOf: dayOf.toLocaleDateString(),
       followUp: followUp.toLocaleDateString()
     };
+  };
+
+  const sendTestEmail = async () => {
+    setIsSendingTestEmail(true);
+    setTestEmailStatus('');
+    
+    try {
+      const testCustomer = {
+        name: "Test Customer",
+        email: "test@example.com",
+        phone: "555-123-4567",
+        service_address: "123 Test Street, Test City, NC 27302",
+        installation_date: "2024-12-25",
+        installation_time: "2:00 PM"
+      };
+
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer: testCustomer,
+          notificationType: 'day_before'
+        }),
+      });
+
+      if (response.ok) {
+        setTestEmailStatus('✅ Test email sent successfully! Check your inbox.');
+      } else {
+        const errorData = await response.json();
+        setTestEmailStatus(`❌ Failed to send test email: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      setTestEmailStatus(`❌ Error sending test email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSendingTestEmail(false);
+    }
   };
 
   const formatCustomerInfo = async () => {
@@ -148,6 +188,25 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
           Customer Management System
         </h1>
+
+        {/* Test Email Section */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Test Email Functionality</h2>
+          <p className="text-gray-600 mb-4">Click the button below to send a test email and verify the email system is working.</p>
+          <button
+            onClick={sendTestEmail}
+            disabled={isSendingTestEmail}
+            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            {isSendingTestEmail ? <LoadingSpinner /> : null}
+            Send Test Email
+          </button>
+          {testEmailStatus && (
+            <p className={`mt-2 ${testEmailStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+              {testEmailStatus}
+            </p>
+          )}
+        </div>
 
         {/* Input Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -262,13 +321,13 @@ export default function Home() {
                   <div key={customer.id} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                                                 <h3 className="font-semibold text-lg text-black">{customer.name}</h3>
-                         <p className="text-black">{customer.email}</p>
-                         <p className="text-black">{customer.phone}</p>
-                         <p className="text-black">{customer.service_address}</p>
-                         <p className="text-black">
-                           Installation: {new Date(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
-                         </p>
+                        <h3 className="font-semibold text-lg text-black">{customer.name}</h3>
+                        <p className="text-black">{customer.email}</p>
+                        <p className="text-black">{customer.phone}</p>
+                        <p className="text-black">{customer.service_address}</p>
+                        <p className="text-black">
+                          Installation: {new Date(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
+                        </p>
                       </div>
                       <button
                         onClick={() => deleteCustomer(customer.id)}
@@ -280,24 +339,24 @@ export default function Home() {
                     
                     {/* Email Schedule */}
                     <div className="bg-blue-50 rounded-lg p-3">
-                                             <h4 className="font-medium text-black mb-2">Email Notifications:</h4>
-                       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                         <div className="flex items-center gap-2">
-                           <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
-                           <span className="text-black">Day Before:</span>
-                           <span className="font-medium text-black">{emailSchedule.dayBefore}</span>
-                         </div>
-                         <div className="flex items-center gap-2">
-                           <span className="w-3 h-3 bg-green-400 rounded-full"></span>
-                           <span className="text-black">Day Of:</span>
-                           <span className="font-medium text-black">{emailSchedule.dayOf}</span>
-                         </div>
-                         <div className="flex items-center gap-2">
-                           <span className="w-3 h-3 bg-blue-400 rounded-full"></span>
-                           <span className="text-black">Follow Up:</span>
-                           <span className="font-medium text-black">{emailSchedule.followUp}</span>
-                         </div>
-                       </div>
+                      <h4 className="font-medium text-black mb-2">Email Notifications:</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
+                          <span className="text-black">Day Before:</span>
+                          <span className="font-medium text-black">{emailSchedule.dayBefore}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 bg-green-400 rounded-full"></span>
+                          <span className="text-black">Day Of:</span>
+                          <span className="font-medium text-black">{emailSchedule.dayOf}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 bg-blue-400 rounded-full"></span>
+                          <span className="text-black">Follow Up:</span>
+                          <span className="font-medium text-black">{emailSchedule.followUp}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
