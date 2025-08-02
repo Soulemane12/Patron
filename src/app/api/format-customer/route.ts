@@ -54,7 +54,7 @@ If any information is missing, use "Not provided" as the value. Ensure the JSON 
     }
 
     // Try to parse the JSON response
-    let formattedData;
+    let formattedData: any;
     try {
       // Extract JSON from the response (in case there's extra text)
       const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
