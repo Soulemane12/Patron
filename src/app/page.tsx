@@ -24,6 +24,8 @@ export default function Home() {
   const [showSaved, setShowSaved] = useState(false);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailStatus, setTestEmailStatus] = useState('');
+  const [isRunningCron, setIsRunningCron] = useState(false);
+  const [cronStatus, setCronStatus] = useState('');
 
   // Calculate email notification dates
   const getEmailSchedule = (installationDate: string) => {
@@ -33,7 +35,7 @@ export default function Home() {
     const dayOf = new Date(installDate);
     const followUp = new Date(installDate);
     followUp.setDate(followUp.getDate() + 10);
-    
+
     return {
       dayBefore: dayBefore.toLocaleDateString(),
       dayOf: dayOf.toLocaleDateString(),
@@ -76,6 +78,27 @@ export default function Home() {
       setTestEmailStatus(`❌ Error sending test email: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSendingTestEmail(false);
+    }
+  };
+  
+  const runCronJob = async () => {
+    setIsRunningCron(true);
+    setCronStatus('');
+    
+    try {
+      const response = await fetch('/api/cron/check-installations');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCronStatus(`✅ Cron job executed successfully! Found: ${data.today} installations today, ${data.tomorrow} tomorrow, ${data.followUp} follow-ups.`);
+      } else {
+        const errorData = await response.json();
+        setCronStatus(`❌ Failed to run cron job: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      setCronStatus(`❌ Error running cron job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsRunningCron(false);
     }
   };
 
@@ -187,52 +210,78 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
           Customer Management System
-        </h1>
+          </h1>
 
         {/* Test Email Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Test Email Functionality</h2>
-          <p className="text-gray-600 mb-4">Click the button below to send a test email and verify the email system is working.</p>
-          <button
-            onClick={sendTestEmail}
-            disabled={isSendingTestEmail}
-            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            {isSendingTestEmail ? <LoadingSpinner /> : null}
-            Send Test Email
-          </button>
-          {testEmailStatus && (
-            <p className={`mt-2 ${testEmailStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
-              {testEmailStatus}
+          <h2 className="text-xl font-semibold mb-4">Test Email & Cron Functionality</h2>
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <div className="flex-1">
+              <p className="text-black mb-2">Send a test email to verify email configuration:</p>
+              <button
+                onClick={sendTestEmail}
+                disabled={isSendingTestEmail}
+                className="w-full px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSendingTestEmail ? <LoadingSpinner /> : null}
+                Send Test Email
+              </button>
+              {testEmailStatus && (
+                <p className={`mt-2 ${testEmailStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+                  {testEmailStatus}
+                </p>
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-black mb-2">Run cron job manually to check for installations:</p>
+              <button
+                onClick={runCronJob}
+                disabled={isRunningCron}
+                className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isRunningCron ? <LoadingSpinner /> : null}
+                Run Cron Job Now
+              </button>
+              {cronStatus && (
+                <p className={`mt-2 ${cronStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+                  {cronStatus}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="mt-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+            <p className="text-black text-sm">
+              <strong>Note:</strong> The cron job checks for customers with installations tomorrow (day before), today (day of), and 10 days ago (follow-up).
+              Current server date: <strong>{new Date().toLocaleDateString()}</strong>
             </p>
-          )}
+          </div>
         </div>
 
-        {/* Input Section */}
+          {/* Input Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Add Customer Information</h2>
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
             placeholder="Paste customer information in any format..."
             className="w-full h-32 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-          />
+                />
           <div className="flex gap-4 mt-4">
-            <button
+                <button
               onClick={formatCustomerInfo}
               disabled={isLoading}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
             >
               {isLoading ? <LoadingSpinner /> : null}
               Format Information
-            </button>
-            <button
+                </button>
+                <button
               onClick={clearForm}
               className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-            >
-              Clear
-            </button>
-          </div>
+                >
+                  Clear
+                </button>
+              </div>
           {error && <p className="text-red-600 mt-2">{error}</p>}
         </div>
 
@@ -320,7 +369,7 @@ export default function Home() {
                 return (
                   <div key={customer.id} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
-                      <div>
+                <div>
                         <h3 className="font-semibold text-lg text-black">{customer.name}</h3>
                         <p className="text-black">{customer.email}</p>
                         <p className="text-black">{customer.phone}</p>
@@ -328,7 +377,7 @@ export default function Home() {
                         <p className="text-black">
                           Installation: {new Date(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
                         </p>
-                      </div>
+                    </div>
                       <button
                         onClick={() => deleteCustomer(customer.id)}
                         className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
@@ -345,23 +394,23 @@ export default function Home() {
                           <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
                           <span className="text-black">Day Before:</span>
                           <span className="font-medium text-black">{emailSchedule.dayBefore}</span>
-                        </div>
+                    </div>
                         <div className="flex items-center gap-2">
                           <span className="w-3 h-3 bg-green-400 rounded-full"></span>
                           <span className="text-black">Day Of:</span>
                           <span className="font-medium text-black">{emailSchedule.dayOf}</span>
-                        </div>
+                    </div>
                         <div className="flex items-center gap-2">
                           <span className="w-3 h-3 bg-blue-400 rounded-full"></span>
                           <span className="text-black">Follow Up:</span>
                           <span className="font-medium text-black">{emailSchedule.followUp}</span>
-                        </div>
-                      </div>
+                  </div>
+                </div>
                     </div>
                   </div>
                 );
               })}
-            </div>
+              </div>
           </div>
         )}
       </div>
