@@ -96,7 +96,16 @@ export async function GET(request: NextRequest) {
 
 async function sendEmailNotification(customer: any, notificationType: string) {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/send-email`, {
+    // Determine the correct base URL (works locally and on Vercel)
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+
+    if (!baseUrl) {
+      throw new Error('Base URL is not configured');
+    }
+
+    const response = await fetch(`${baseUrl}/api/send-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
