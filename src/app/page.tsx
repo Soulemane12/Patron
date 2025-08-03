@@ -35,6 +35,9 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState<string>('pipeline');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterBy, setFilterBy] = useState<string>('all');
 
 
   // Calculate email notification dates
@@ -213,22 +216,82 @@ export default function Home() {
     }
   };
 
-  // Filter customers based on search term
-  const filterCustomers = (term: string) => {
-    if (!term.trim()) {
-      setFilteredCustomers(customers);
-      return;
+  // Filter and sort customers based on search term, filter, and sort options
+  const filterAndSortCustomers = (term: string, filter: string, sort: string, order: 'asc' | 'desc') => {
+    let filtered = [...customers];
+    
+    // Apply search filter
+    if (term.trim()) {
+      const lowerCaseTerm = term.toLowerCase();
+      filtered = filtered.filter(customer => 
+        customer.name.toLowerCase().includes(lowerCaseTerm) ||
+        customer.email.toLowerCase().includes(lowerCaseTerm) ||
+        customer.phone.toLowerCase().includes(lowerCaseTerm) ||
+        customer.service_address.toLowerCase().includes(lowerCaseTerm) ||
+        customer.installation_date.includes(lowerCaseTerm) ||
+        customer.installation_time.toLowerCase().includes(lowerCaseTerm)
+      );
     }
     
-    const lowerCaseTerm = term.toLowerCase();
-    const filtered = customers.filter(customer => 
-      customer.name.toLowerCase().includes(lowerCaseTerm) ||
-      customer.email.toLowerCase().includes(lowerCaseTerm) ||
-      customer.phone.toLowerCase().includes(lowerCaseTerm) ||
-      customer.service_address.toLowerCase().includes(lowerCaseTerm) ||
-      customer.installation_date.includes(lowerCaseTerm) ||
-      customer.installation_time.toLowerCase().includes(lowerCaseTerm)
-    );
+    // Apply date filter
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    
+    if (filter === 'upcoming') {
+      filtered = filtered.filter(customer => customer.installation_date >= todayString);
+    } else if (filter === 'past') {
+      filtered = filtered.filter(customer => customer.installation_date < todayString);
+    } else if (filter === 'this_week') {
+      const oneWeekFromNow = new Date();
+      oneWeekFromNow.setDate(today.getDate() + 7);
+      const oneWeekString = oneWeekFromNow.toISOString().split('T')[0];
+      filtered = filtered.filter(customer => 
+        customer.installation_date >= todayString && 
+        customer.installation_date <= oneWeekString
+      );
+    } else if (filter === 'this_month') {
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const firstDayString = firstDayOfMonth.toISOString().split('T')[0];
+      const lastDayString = lastDayOfMonth.toISOString().split('T')[0];
+      filtered = filtered.filter(customer => 
+        customer.installation_date >= firstDayString && 
+        customer.installation_date <= lastDayString
+      );
+    }
+    
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (sort) {
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'installation_date':
+          aValue = new Date(a.installation_date);
+          bValue = new Date(b.installation_date);
+          break;
+        case 'created_at':
+          aValue = new Date(a.created_at);
+          bValue = new Date(b.created_at);
+          break;
+        case 'email':
+          aValue = a.email.toLowerCase();
+          bValue = b.email.toLowerCase();
+          break;
+        default:
+          aValue = a.created_at;
+          bValue = b.created_at;
+      }
+      
+      if (order === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
     
     setFilteredCustomers(filtered);
   };
@@ -237,7 +300,28 @@ export default function Home() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
     setSearchTerm(term);
-    filterCustomers(term);
+    filterAndSortCustomers(term, filterBy, sortBy, sortOrder);
+  };
+
+  // Handle sort change
+  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newSortBy = e.target.value;
+    setSortBy(newSortBy);
+    filterAndSortCustomers(searchTerm, filterBy, newSortBy, sortOrder);
+  };
+
+  // Handle sort order toggle
+  const toggleSortOrder = () => {
+    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortOrder(newOrder);
+    filterAndSortCustomers(searchTerm, filterBy, sortBy, newOrder);
+  };
+
+  // Handle filter change
+  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newFilter = e.target.value;
+    setFilterBy(newFilter);
+    filterAndSortCustomers(searchTerm, newFilter, sortBy, sortOrder);
   };
 
   useEffect(() => {
@@ -246,8 +330,8 @@ export default function Home() {
   
   // Update filtered customers when customers change
   useEffect(() => {
-    filterCustomers(searchTerm);
-  }, [customers]);
+    filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder);
+  }, [customers, searchTerm, filterBy, sortBy, sortOrder]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 py-4 md:py-8">
@@ -307,6 +391,62 @@ export default function Home() {
                   placeholder="Search customers by name, email, phone..." 
                 />
               </div>
+            </div>
+
+            {/* Filter and Sort Controls */}
+            <div className="mb-4 flex flex-wrap gap-3 items-center">
+              {/* Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-black">Filter:</label>
+                <select 
+                  value={filterBy}
+                  onChange={handleFilterChange}
+                  className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Customers</option>
+                  <option value="upcoming">Upcoming Installations</option>
+                  <option value="past">Past Installations</option>
+                  <option value="this_week">This Week</option>
+                  <option value="this_month">This Month</option>
+                </select>
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-black">Sort by:</label>
+                <select 
+                  value={sortBy}
+                  onChange={handleSortChange}
+                  className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="created_at">Date Added</option>
+                  <option value="name">Name</option>
+                  <option value="installation_date">Installation Date</option>
+                  <option value="email">Email</option>
+                </select>
+              </div>
+
+              {/* Sort Order Toggle */}
+              <button
+                onClick={toggleSortOrder}
+                className="flex items-center gap-1 px-2 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+              >
+                {sortOrder === 'asc' ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                    </svg>
+                    A-Z
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+                    </svg>
+                    Z-A
+                  </>
+                )}
+              </button>
             </div>
             
             {filteredCustomers.length > 0 ? (
@@ -368,8 +508,8 @@ export default function Home() {
               </div>
             ) : (
               <p className="text-center py-8 text-black">
-                {searchTerm ? 
-                  `No customers found matching "${searchTerm}". Try a different search term.` : 
+                {searchTerm || filterBy !== 'all' ? 
+                  `No customers found with the current filters. Try adjusting your search or filter settings.` : 
                   "No saved customers yet. Add a new lead to get started."
                 }
               </p>
@@ -500,7 +640,7 @@ export default function Home() {
             <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4 text-blue-800">Review Lead Information</h2>
             <p className="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">Verify the details below before saving this lead to your sales pipeline.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+                <div>
                 <label className="block text-xs md:text-sm font-medium text-black mb-1">Name</label>
                 <input
                   type="text"
@@ -508,7 +648,7 @@ export default function Home() {
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, name: e.target.value })}
                   className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
-              </div>
+                    </div>
               <div>
                 <label className="block text-xs md:text-sm font-medium text-black mb-1">Email</label>
                 <input
@@ -517,7 +657,7 @@ export default function Home() {
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, email: e.target.value })}
                   className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
-              </div>
+                    </div>
               <div>
                 <label className="block text-xs md:text-sm font-medium text-black mb-1">Phone</label>
                 <input
@@ -526,7 +666,7 @@ export default function Home() {
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, phone: e.target.value })}
                   className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
-              </div>
+                    </div>
               <div>
                 <label className="block text-xs md:text-sm font-medium text-black mb-1">Service Address</label>
                 <input
@@ -535,8 +675,8 @@ export default function Home() {
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, serviceAddress: e.target.value })}
                   className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
-              </div>
-              <div>
+                </div>
+                <div>
                 <label className="block text-xs md:text-sm font-medium text-black mb-1">Installation Date</label>
                 <input
                   type="date"
