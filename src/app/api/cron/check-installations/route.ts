@@ -96,31 +96,78 @@ export async function GET(request: NextRequest) {
 
 async function sendEmailNotification(customer: any, notificationType: string) {
   try {
-    // Determine the correct base URL (works locally and on Vercel)
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-
-    if (!baseUrl) {
-      throw new Error('Base URL is not configured');
-    }
-
-    const response = await fetch(`${baseUrl}/api/send-email`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        customer,
-        notificationType
-      }),
+    // Import nodemailer directly here instead of calling the API
+    const nodemailer = require('nodemailer');
+    
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: 'Thechosen1351@gmail.com',
+        pass: process.env.EMAIL_PASSWORD
+      }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('send-email failed', response.status, errorText);
-      throw new Error('Failed to send email');
+    let subject = '';
+    let emailContent = '';
+
+    switch (notificationType) {
+      case 'day_before':
+        subject = 'Installation Reminder - Day Before';
+        emailContent = `
+          <h2>Installation Reminder - Tomorrow</h2>
+          <p>This is a reminder that you have an installation scheduled for tomorrow.</p>
+          <h3>Customer Information:</h3>
+          <ul>
+            <li><strong>Name:</strong> ${customer.name}</li>
+            <li><strong>Installation Date:</strong> ${new Date(customer.installation_date).toLocaleDateString()}</li>
+            <li><strong>Time:</strong> ${customer.installation_time}</li>
+            <li><strong>Service Address:</strong> ${customer.service_address}</li>
+            <li><strong>Phone:</strong> ${customer.phone}</li>
+            <li><strong>Email:</strong> ${customer.email}</li>
+          </ul>
+        `;
+        break;
+      case 'day_of':
+        subject = 'Installation Reminder - Today';
+        emailContent = `
+          <h2>Installation Reminder - Today</h2>
+          <p>This is a reminder that you have an installation scheduled for today.</p>
+          <h3>Customer Information:</h3>
+          <ul>
+            <li><strong>Name:</strong> ${customer.name}</li>
+            <li><strong>Installation Time:</strong> ${customer.installation_time}</li>
+            <li><strong>Service Address:</strong> ${customer.service_address}</li>
+            <li><strong>Phone:</strong> ${customer.phone}</li>
+            <li><strong>Email:</strong> ${customer.email}</li>
+          </ul>
+        `;
+        break;
+      case 'follow_up':
+        subject = 'Installation Follow-up';
+        emailContent = `
+          <h2>Installation Follow-up</h2>
+          <p>This is a follow-up for the installation completed 10 days ago.</p>
+          <h3>Customer Information:</h3>
+          <ul>
+            <li><strong>Name:</strong> ${customer.name}</li>
+            <li><strong>Installation Date:</strong> ${new Date(customer.installation_date).toLocaleDateString()}</li>
+            <li><strong>Service Address:</strong> ${customer.service_address}</li>
+            <li><strong>Phone:</strong> ${customer.phone}</li>
+            <li><strong>Email:</strong> ${customer.email}</li>
+          </ul>
+        `;
+        break;
     }
+
+    const mailOptions = {
+      from: 'Thechosen1351@gmail.com',
+      to: 'Thechosen1351@gmail.com',
+      subject: subject,
+      html: emailContent
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully for', notificationType);
   } catch (error) {
     console.error('Error sending email notification:', error);
   }
