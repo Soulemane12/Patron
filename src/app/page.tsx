@@ -5,6 +5,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 import { supabase, Customer } from '../lib/supabase';
 import InstallationCalendar from './components/InstallationCalendar';
 import DailyInstallations from './components/DailyInstallations';
+import Navbar from './components/Navbar';
 
 interface CustomerInfo {
   name: string;
@@ -31,7 +32,7 @@ export default function Home() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedDateInstallations, setSelectedDateInstallations] = useState<Customer[]>([]);
-  const [showCalendarView, setShowCalendarView] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('pipeline');
 
 
   // Calculate email notification dates
@@ -118,6 +119,9 @@ export default function Home() {
       setTimeout(() => setShowSaved(false), 3000);
       loadCustomers();
       clearForm();
+      
+      // Switch to pipeline view after saving
+      setActiveSection('pipeline');
     } catch (error) {
       console.error('Error saving customer:', error);
     } finally {
@@ -168,8 +172,13 @@ export default function Home() {
     setSelectedDateInstallations(installations);
   };
   
-  const toggleCalendarView = () => {
-    setShowCalendarView(!showCalendarView);
+  const handleSectionChange = (section: string) => {
+    setActiveSection(section);
+    
+    // If switching to calendar view, reset the selected date
+    if (section === 'calendar' && !selectedDate) {
+      setSelectedDate(new Date());
+    }
   };
 
   const updateCustomer = async () => {
@@ -212,36 +221,24 @@ export default function Home() {
             Sales Pro Tracker
           </h1>
           <p className="text-gray-600">Your door-to-door sales assistant for managing customers and follow-ups</p>
-          <div className="flex justify-center mt-4">
-            <button
-              onClick={toggleCalendarView}
-              className={`px-4 py-2 rounded-lg mr-2 ${showCalendarView 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-800'}`}
-            >
-              Calendar View
-            </button>
-            <button
-              onClick={() => setShowCalendarView(false)}
-              className={`px-4 py-2 rounded-lg ${!showCalendarView 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-800'}`}
-            >
-              List View
-            </button>
-          </div>
         </div>
+        
+        <Navbar activeSection={activeSection} onSectionChange={handleSectionChange} />
 
 
         {/* Calendar View */}
-        {showCalendarView && customers.length > 0 && (
+        {activeSection === 'calendar' && (
           <div className="mb-8">
             <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500">
               <h2 className="text-xl font-semibold mb-4 text-blue-800">Installation Calendar</h2>
-              <InstallationCalendar 
-                customers={customers} 
-                onDateClick={handleDateClick} 
-              />
+              {customers.length > 0 ? (
+                <InstallationCalendar 
+                  customers={customers} 
+                  onDateClick={handleDateClick} 
+                />
+              ) : (
+                <p className="text-center py-8 text-black">No installations scheduled yet. Add some leads to see them on the calendar.</p>
+              )}
             </div>
             
             {selectedDate && (
@@ -253,12 +250,13 @@ export default function Home() {
           </div>
         )}
 
-        {/* Saved Customers */}
-        {(!showCalendarView && customers.length > 0) && (
+        {/* Sales Pipeline */}
+        {activeSection === 'pipeline' && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-t-4 border-blue-500">
             <h2 className="text-xl font-semibold mb-4 text-blue-800">Your Sales Pipeline</h2>
-            <div className="space-y-4">
-              {customers.map((customer) => {
+            {customers.length > 0 ? (
+              <div className="space-y-4">
+                {customers.map((customer) => {
                 const emailSchedule = getEmailSchedule(customer.installation_date);
                 return (
                   <div key={customer.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -312,7 +310,10 @@ export default function Home() {
                   </div>
                 );
               })}
-            </div>
+              </div>
+            ) : (
+              <p className="text-center py-8 text-black">No customers in your pipeline yet. Add a new lead to get started.</p>
+            )}
           </div>
         )}
         
@@ -397,16 +398,17 @@ export default function Home() {
           </div>
         )}
 
-        {/* Input Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-t-4 border-green-500">
-          <h2 className="text-xl font-semibold mb-4 text-blue-800">Add New Sales Lead</h2>
-          <p className="text-gray-600 mb-4">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
-                <textarea
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-            placeholder="Example: John Smith, phone 555-123-4567, email john@example.com, address 123 Main St, installation scheduled for June 15th at 2pm..."
-            className="w-full h-32 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                />
+        {/* Add New Lead Section */}
+        {activeSection === 'add' && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-t-4 border-green-500">
+            <h2 className="text-xl font-semibold mb-4 text-blue-800">Add New Sales Lead</h2>
+            <p className="text-gray-600 mb-4">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Example: John Smith, phone 555-123-4567, email john@example.com, address 123 Main St, installation scheduled for June 15th at 2pm..."
+              className="w-full h-32 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
           <div className="flex gap-4 mt-4">
                 <button
               onClick={formatCustomerInfo}
@@ -428,11 +430,12 @@ export default function Home() {
                   Clear
                 </button>
               </div>
-          {error && <p className="text-red-600 mt-2">{error}</p>}
-        </div>
+            {error && <p className="text-red-600 mt-2">{error}</p>}
+          </div>
+        )}
 
-        {/* Formatted Information */}
-        {formattedInfo && (
+        {/* Formatted Information - Only show when in Add section */}
+        {activeSection === 'add' && formattedInfo && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-t-4 border-purple-500">
             <h2 className="text-xl font-semibold mb-4 text-blue-800">Review Lead Information</h2>
             <p className="text-gray-600 mb-4">Verify the details below before saving this lead to your sales pipeline.</p>
