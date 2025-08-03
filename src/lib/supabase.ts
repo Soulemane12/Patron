@@ -16,6 +16,8 @@ export interface Customer {
   created_at: string;
   updated_at: string;
   status?: 'active' | 'cancelled' | 'completed';
+  is_referral?: boolean;
+  referral_source?: string;
 }
 
 export interface EmailNotification {

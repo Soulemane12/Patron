@@ -20,6 +20,8 @@ export default function StatsPage({ customers }: StatsPageProps) {
   const [activeCustomers, setActiveCustomers] = useState<number>(0);
   const [cancelledCustomers, setCancelledCustomers] = useState<number>(0);
   const [completedCustomers, setCompletedCustomers] = useState<number>(0);
+  const [referralCustomers, setReferralCustomers] = useState<number>(0);
+  const [referralSources, setReferralSources] = useState<{source: string, count: number}[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
   const [mostPopularDay, setMostPopularDay] = useState<string>('');
   const [topAreas, setTopAreas] = useState<{area: string, count: number}[]>([]);
@@ -60,6 +62,26 @@ export default function StatsPage({ customers }: StatsPageProps) {
     
     const completed = customers.filter(c => c.status === 'completed');
     setCompletedCustomers(completed.length);
+    
+    // Referral statistics
+    const referrals = customers.filter(c => c.is_referral === true);
+    setReferralCustomers(referrals.length);
+    
+    // Calculate top referral sources
+    const sourceCount: {[key: string]: number} = {};
+    referrals.forEach(c => {
+      if (c.referral_source) {
+        const source = c.referral_source;
+        sourceCount[source] = (sourceCount[source] || 0) + 1;
+      }
+    });
+    
+    const sortedSources = Object.entries(sourceCount)
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+    
+    setReferralSources(sortedSources);
     
     // Calculate monthly stats for the last 6 months
     const monthlyData: MonthlyStats[] = [];
@@ -140,7 +162,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
       <h2 className="text-lg md:text-xl font-semibold mb-4 text-blue-800">Sales Analytics</h2>
       
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-blue-50 p-4 rounded-lg text-center">
           <p className="text-sm text-gray-600">Total Customers</p>
           <p className="text-2xl font-bold text-blue-700">{totalCustomers}</p>
@@ -156,6 +178,10 @@ export default function StatsPage({ customers }: StatsPageProps) {
         <div className="bg-purple-50 p-4 rounded-lg text-center">
           <p className="text-sm text-gray-600">This Month</p>
           <p className="text-2xl font-bold text-purple-700">{thisMonthInstallations}</p>
+        </div>
+        <div className="bg-pink-50 p-4 rounded-lg text-center">
+          <p className="text-sm text-gray-600">Total Referrals</p>
+          <p className="text-2xl font-bold text-pink-700">{referralCustomers}</p>
         </div>
       </div>
       
@@ -205,6 +231,41 @@ export default function StatsPage({ customers }: StatsPageProps) {
             <p className="text-black">Not enough data</p>
           )}
         </div>
+      </div>
+      
+      {/* Referral Insights */}
+      <div className="mt-6 bg-purple-50 p-4 rounded-lg">
+        <h3 className="text-md font-semibold mb-3 text-purple-800">Referral Statistics</h3>
+        
+        <div className="flex items-center mb-3">
+          <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mr-4">
+            <span className="text-2xl font-bold text-purple-700">{referralCustomers}</span>
+          </div>
+          <div>
+            <p className="font-medium text-black">Total Referrals</p>
+            <p className="text-sm text-gray-600">
+              {totalCustomers > 0 ? Math.round((referralCustomers / totalCustomers) * 100) : 0}% of all customers
+            </p>
+          </div>
+        </div>
+        
+        {referralSources.length > 0 ? (
+          <div>
+            <h4 className="text-sm font-medium text-black mb-2">Top Referral Sources:</h4>
+            <ul className="space-y-1">
+              {referralSources.map((source, index) => (
+                <li key={index} className="flex justify-between">
+                  <span className="text-sm text-black">{source.source}</span>
+                  <span className="text-sm font-medium text-purple-700">{source.count} referrals</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : referralCustomers > 0 ? (
+          <p className="text-sm text-black">No specific sources recorded</p>
+        ) : (
+          <p className="text-sm text-black">No referrals recorded yet</p>
+        )}
       </div>
       
       {/* Status Breakdown */}

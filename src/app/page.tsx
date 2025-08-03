@@ -15,6 +15,8 @@ interface CustomerInfo {
   serviceAddress: string;
   installationDate: string;
   installationTime: string;
+  isReferral: boolean;
+  referralSource: string;
 }
 
 export default function Home() {
@@ -84,7 +86,12 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setFormattedInfo(data);
+      // Initialize referral fields
+      setFormattedInfo({
+        ...data,
+        isReferral: false,
+        referralSource: ''
+      });
       setShowCopied(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -116,6 +123,8 @@ export default function Home() {
             installation_date: formattedInfo.installationDate,
             installation_time: formattedInfo.installationTime,
             status: 'active', // Default status for new customers
+            is_referral: formattedInfo.isReferral || false,
+            referral_source: formattedInfo.isReferral ? formattedInfo.referralSource : null,
           },
         ])
         .select();
@@ -206,6 +215,8 @@ export default function Home() {
           installation_date: editingCustomer.installation_date,
           installation_time: editingCustomer.installation_time,
           status: status,
+          is_referral: editingCustomer.is_referral || false,
+          referral_source: editingCustomer.is_referral ? (editingCustomer.referral_source || '') : null,
         })
         .eq('id', editingCustomer.id);
 
@@ -248,7 +259,9 @@ export default function Home() {
       filtered = filtered.filter(customer => customer.status === 'cancelled');
     } else if (filter === 'completed') {
       filtered = filtered.filter(customer => customer.status === 'completed');
-    } 
+    } else if (filter === 'referrals') {
+      filtered = filtered.filter(customer => customer.is_referral === true);
+    }
     // Date filters
     else if (filter === 'upcoming') {
       filtered = filtered.filter(customer => customer.installation_date >= todayString);
@@ -426,6 +439,7 @@ export default function Home() {
                   <option value="active">Active Customers</option>
                   <option value="cancelled">Cancelled Customers</option>
                   <option value="completed">Completed Installations</option>
+                  <option value="referrals">Referrals</option>
                   <option value="upcoming">Upcoming Installations</option>
                   <option value="past">Past Installations</option>
                   <option value="this_week">This Week</option>
@@ -553,6 +567,43 @@ export default function Home() {
                                 className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                               />
                             </div>
+                            <div>
+                              <label className="block text-xs md:text-sm font-medium text-black mb-1">Is Referral?</label>
+                              <div className="flex items-center gap-4 mt-1">
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="radio"
+                                    name="is_referral"
+                                    checked={editingCustomer.is_referral === true}
+                                    onChange={() => setEditingCustomer({ ...editingCustomer, is_referral: true })}
+                                    className="form-radio h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-black">Yes</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                  <input
+                                    type="radio"
+                                    name="is_referral"
+                                    checked={editingCustomer.is_referral === false || editingCustomer.is_referral === undefined}
+                                    onChange={() => setEditingCustomer({ ...editingCustomer, is_referral: false, referral_source: '' })}
+                                    className="form-radio h-4 w-4 text-blue-600"
+                                  />
+                                  <span className="ml-2 text-sm text-black">No</span>
+                                </label>
+                              </div>
+                            </div>
+                            {editingCustomer.is_referral && (
+                              <div>
+                                <label className="block text-xs md:text-sm font-medium text-black mb-1">Referral Source</label>
+                                <input
+                                  type="text"
+                                  value={editingCustomer.referral_source || ''}
+                                  onChange={(e) => setEditingCustomer({ ...editingCustomer, referral_source: e.target.value })}
+                                  placeholder="Who referred this customer?"
+                                  className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                                />
+                              </div>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-2 mt-3">
                             <button
@@ -579,17 +630,24 @@ export default function Home() {
                           <div>
                             <div className="flex items-center gap-2 mb-1">
                               <h3 className="font-semibold text-base md:text-lg text-black">{customer.name}</h3>
-                              {customer.status && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                  customer.status === 'active' 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : customer.status === 'cancelled'
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-blue-100 text-blue-800'
-                                }`}>
-                                  {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
-                                </span>
-                              )}
+                              <div className="flex gap-1">
+                                {customer.status && (
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    customer.status === 'active' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : customer.status === 'cancelled'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                                  </span>
+                                )}
+                                {customer.is_referral && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                                    Referral
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <p className="text-sm md:text-base text-black">{customer.email}</p>
                             <p className="text-sm md:text-base text-black">{customer.phone}</p>
@@ -597,6 +655,11 @@ export default function Home() {
                             <p className="text-sm md:text-base text-black">
                               <span className="font-medium">Installation:</span> {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
                             </p>
+                            {customer.is_referral && customer.referral_source && (
+                              <p className="text-sm md:text-base text-purple-700 mt-1">
+                                <span className="font-medium">Referred by:</span> {customer.referral_source}
+                              </p>
+                            )}
                           </div>
                           <div className="flex gap-2 mt-2 md:mt-0">
                             <button
@@ -712,7 +775,32 @@ export default function Home() {
                   className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
                     </div>
-              <div>
+                <div>
+                  <label className="block text-xs md:text-sm font-medium text-black mb-1">Is Referral?</label>
+                  <div className="flex items-center gap-4 mt-1">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        name="formatted_is_referral"
+                        checked={formattedInfo.isReferral === true}
+                        onChange={() => setFormattedInfo({ ...formattedInfo, isReferral: true })}
+                        className="form-radio h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2 text-sm text-black">Yes</span>
+                    </label>
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        name="formatted_is_referral"
+                        checked={formattedInfo.isReferral === false || formattedInfo.isReferral === undefined}
+                        onChange={() => setFormattedInfo({ ...formattedInfo, isReferral: false, referralSource: '' })}
+                        className="form-radio h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2 text-sm text-black">No</span>
+                    </label>
+                  </div>
+                </div>
+                <div>
                 <label className="block text-xs md:text-sm font-medium text-black mb-1">Email</label>
                 <input
                   type="email"
@@ -757,6 +845,18 @@ export default function Home() {
                   className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
               </div>
+              {formattedInfo.isReferral && (
+                <div>
+                  <label className="block text-xs md:text-sm font-medium text-black mb-1">Referral Source</label>
+                  <input
+                    type="text"
+                    value={formattedInfo.referralSource || ''}
+                    onChange={(e) => setFormattedInfo({ ...formattedInfo, referralSource: e.target.value })}
+                    placeholder="Who referred this customer?"
+                    className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                  />
+                </div>
+              )}
             </div>
             <button
               onClick={saveCustomer}
