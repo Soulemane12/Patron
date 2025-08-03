@@ -26,21 +26,66 @@ export default function Home() {
   const [showSaved, setShowSaved] = useState(false);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailStatus, setTestEmailStatus] = useState('');
+  const [cronSchedule, setCronSchedule] = useState('');
+  const [newCronSchedule, setNewCronSchedule] = useState('');
+  const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
+  const [scheduleStatus, setScheduleStatus] = useState('');
 
   // Calculate email notification dates
-    const getEmailSchedule = (installationDate: string) => {
+  const getEmailSchedule = (installationDate: string) => {
     const installDate = parseDateLocal(installationDate);
     const dayBefore = new Date(installDate);
     dayBefore.setDate(dayBefore.getDate() - 1);
     const dayOf = new Date(installDate);
     const followUp = new Date(installDate);
     followUp.setDate(followUp.getDate() + 10);
-
+    
     return {
       dayBefore: dayBefore.toLocaleDateString(),
       dayOf: dayOf.toLocaleDateString(),
       followUp: followUp.toLocaleDateString()
     };
+  };
+
+  const loadCronSchedule = async () => {
+    try {
+      const response = await fetch('/api/cron/schedule');
+      if (response.ok) {
+        const data = await response.json();
+        setCronSchedule(data.schedule);
+        setNewCronSchedule(data.schedule);
+      }
+    } catch (error) {
+      console.error('Error loading cron schedule:', error);
+    }
+  };
+
+  const updateCronSchedule = async () => {
+    setIsUpdatingSchedule(true);
+    setScheduleStatus('');
+    
+    try {
+      const response = await fetch('/api/cron/schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ schedule: newCronSchedule }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCronSchedule(data.schedule);
+        setScheduleStatus('✅ Schedule updated! Deploy to apply changes.');
+      } else {
+        const errorData = await response.json();
+        setScheduleStatus(`❌ Failed to update schedule: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      setScheduleStatus(`❌ Error updating schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsUpdatingSchedule(false);
+    }
   };
 
   const sendTestEmail = async () => {
@@ -182,6 +227,7 @@ export default function Home() {
 
   useEffect(() => {
     loadCustomers();
+    loadCronSchedule();
   }, []);
 
   return (
@@ -189,7 +235,39 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
           Customer Management System
-          </h1>
+        </h1>
+
+        {/* Cron Schedule Management */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Cron Schedule Management</h2>
+          <p className="text-gray-600 mb-4">Current schedule: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{cronSchedule}</span></p>
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">New Schedule (UTC)</label>
+              <input
+                type="text"
+                value={newCronSchedule}
+                onChange={(e) => setNewCronSchedule(e.target.value)}
+                placeholder="0 14 * * *"
+                className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+              />
+              <p className="text-xs text-gray-500 mt-1">Format: minute hour day month weekday (e.g., "0 14 * * *" = 2:00 PM UTC daily)</p>
+            </div>
+            <button
+              onClick={updateCronSchedule}
+              disabled={isUpdatingSchedule || newCronSchedule === cronSchedule}
+              className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {isUpdatingSchedule ? <LoadingSpinner /> : null}
+              Update Schedule
+            </button>
+          </div>
+          {scheduleStatus && (
+            <p className={`mt-2 ${scheduleStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+              {scheduleStatus}
+            </p>
+          )}
+        </div>
 
         {/* Test Email Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -210,31 +288,31 @@ export default function Home() {
           )}
         </div>
 
-          {/* Input Section */}
+        {/* Input Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Add Customer Information</h2>
-                <textarea
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+          <textarea
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
             placeholder="Paste customer information in any format..."
             className="w-full h-32 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                />
+          />
           <div className="flex gap-4 mt-4">
-                <button
+            <button
               onClick={formatCustomerInfo}
               disabled={isLoading}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
             >
               {isLoading ? <LoadingSpinner /> : null}
               Format Information
-                </button>
-                <button
+            </button>
+            <button
               onClick={clearForm}
               className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                >
-                  Clear
-                </button>
-              </div>
+            >
+              Clear
+            </button>
+          </div>
           {error && <p className="text-red-600 mt-2">{error}</p>}
         </div>
 
@@ -322,7 +400,7 @@ export default function Home() {
                 return (
                   <div key={customer.id} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
-                <div>
+                      <div>
                         <h3 className="font-semibold text-lg text-black">{customer.name}</h3>
                         <p className="text-black">{customer.email}</p>
                         <p className="text-black">{customer.phone}</p>
@@ -330,7 +408,7 @@ export default function Home() {
                         <p className="text-black">
                           Installation: {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
                         </p>
-                    </div>
+                      </div>
                       <button
                         onClick={() => deleteCustomer(customer.id)}
                         className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
@@ -347,23 +425,23 @@ export default function Home() {
                           <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
                           <span className="text-black">Day Before:</span>
                           <span className="font-medium text-black">{emailSchedule.dayBefore}</span>
-                    </div>
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="w-3 h-3 bg-green-400 rounded-full"></span>
                           <span className="text-black">Day Of:</span>
                           <span className="font-medium text-black">{emailSchedule.dayOf}</span>
-                    </div>
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="w-3 h-3 bg-blue-400 rounded-full"></span>
                           <span className="text-black">Follow Up:</span>
                           <span className="font-medium text-black">{emailSchedule.followUp}</span>
-                  </div>
-                </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
               })}
-              </div>
+            </div>
           </div>
         )}
       </div>
