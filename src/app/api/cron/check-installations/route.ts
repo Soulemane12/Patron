@@ -116,12 +116,17 @@ async function sendEmailNotification(customer: any, notificationType: string) {
         emailContent = `
           <h2>Installation Reminder - Tomorrow</h2>
           <p>This is a reminder that you have an installation scheduled for tomorrow.</p>
+          
+          <h3>Installation Details:</h3>
+          <ul>
+            <li><strong>Date:</strong> ${new Date(customer.installation_date).toLocaleDateString()}</li>
+            <li><strong>Time:</strong> ${customer.installation_time}</li>
+            <li><strong>Service Address:</strong> ${customer.service_address}</li>
+          </ul>
+          
           <h3>Customer Information:</h3>
           <ul>
             <li><strong>Name:</strong> ${customer.name}</li>
-            <li><strong>Installation Date:</strong> ${new Date(customer.installation_date).toLocaleDateString()}</li>
-            <li><strong>Time:</strong> ${customer.installation_time}</li>
-            <li><strong>Service Address:</strong> ${customer.service_address}</li>
             <li><strong>Phone:</strong> ${customer.phone}</li>
             <li><strong>Email:</strong> ${customer.email}</li>
           </ul>
@@ -132,11 +137,16 @@ async function sendEmailNotification(customer: any, notificationType: string) {
         emailContent = `
           <h2>Installation Reminder - Today</h2>
           <p>This is a reminder that you have an installation scheduled for today.</p>
+          
+          <h3>Installation Details:</h3>
+          <ul>
+            <li><strong>Time:</strong> ${customer.installation_time}</li>
+            <li><strong>Service Address:</strong> ${customer.service_address}</li>
+          </ul>
+          
           <h3>Customer Information:</h3>
           <ul>
             <li><strong>Name:</strong> ${customer.name}</li>
-            <li><strong>Installation Time:</strong> ${customer.installation_time}</li>
-            <li><strong>Service Address:</strong> ${customer.service_address}</li>
             <li><strong>Phone:</strong> ${customer.phone}</li>
             <li><strong>Email:</strong> ${customer.email}</li>
           </ul>
@@ -147,11 +157,16 @@ async function sendEmailNotification(customer: any, notificationType: string) {
         emailContent = `
           <h2>Installation Follow-up</h2>
           <p>This is a follow-up for the installation completed 10 days ago.</p>
+          
+          <h3>Installation Details:</h3>
+          <ul>
+            <li><strong>Date:</strong> ${new Date(customer.installation_date).toLocaleDateString()}</li>
+            <li><strong>Service Address:</strong> ${customer.service_address}</li>
+          </ul>
+          
           <h3>Customer Information:</h3>
           <ul>
             <li><strong>Name:</strong> ${customer.name}</li>
-            <li><strong>Installation Date:</strong> ${new Date(customer.installation_date).toLocaleDateString()}</li>
-            <li><strong>Service Address:</strong> ${customer.service_address}</li>
             <li><strong>Phone:</strong> ${customer.phone}</li>
             <li><strong>Email:</strong> ${customer.email}</li>
           </ul>
