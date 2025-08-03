@@ -33,6 +33,8 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedDateInstallations, setSelectedDateInstallations] = useState<Customer[]>([]);
   const [activeSection, setActiveSection] = useState<string>('pipeline');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
 
 
   // Calculate email notification dates
@@ -137,7 +139,9 @@ export default function Home() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCustomers(data || []);
+      const loadedCustomers = data || [];
+      setCustomers(loadedCustomers);
+      setFilteredCustomers(loadedCustomers);
     } catch (error) {
       console.error('Error loading customers:', error);
     }
@@ -209,9 +213,41 @@ export default function Home() {
     }
   };
 
+  // Filter customers based on search term
+  const filterCustomers = (term: string) => {
+    if (!term.trim()) {
+      setFilteredCustomers(customers);
+      return;
+    }
+    
+    const lowerCaseTerm = term.toLowerCase();
+    const filtered = customers.filter(customer => 
+      customer.name.toLowerCase().includes(lowerCaseTerm) ||
+      customer.email.toLowerCase().includes(lowerCaseTerm) ||
+      customer.phone.toLowerCase().includes(lowerCaseTerm) ||
+      customer.service_address.toLowerCase().includes(lowerCaseTerm) ||
+      customer.installation_date.includes(lowerCaseTerm) ||
+      customer.installation_time.toLowerCase().includes(lowerCaseTerm)
+    );
+    
+    setFilteredCustomers(filtered);
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+    filterCustomers(term);
+  };
+
   useEffect(() => {
     loadCustomers();
   }, []);
+  
+  // Update filtered customers when customers change
+  useEffect(() => {
+    filterCustomers(searchTerm);
+  }, [customers]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 py-4 md:py-8">
@@ -254,9 +290,28 @@ export default function Home() {
         {activeSection === 'pipeline' && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8 border-t-4 border-blue-500">
             <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 text-blue-800">Your Saved Customers</h2>
-            {customers.length > 0 ? (
+            
+            {/* Search Bar */}
+            <div className="mb-4">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+                  </svg>
+                </div>
+                <input 
+                  type="search" 
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  className="block w-full p-2 pl-10 text-sm text-black border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                  placeholder="Search customers by name, email, phone..." 
+                />
+              </div>
+            </div>
+            
+            {filteredCustomers.length > 0 ? (
               <div className="space-y-4">
-                {customers.map((customer) => {
+                {filteredCustomers.map((customer) => {
                 const emailSchedule = getEmailSchedule(customer.installation_date);
                 return (
                   <div key={customer.id} className="border border-gray-200 rounded-lg p-3 md:p-4 hover:shadow-md transition-shadow">
@@ -312,7 +367,12 @@ export default function Home() {
               })}
               </div>
             ) : (
-              <p className="text-center py-8 text-black">No saved customers yet. Add a new lead to get started.</p>
+              <p className="text-center py-8 text-black">
+                {searchTerm ? 
+                  `No customers found matching "${searchTerm}". Try a different search term.` : 
+                  "No saved customers yet. Add a new lead to get started."
+                }
+              </p>
             )}
           </div>
         )}
