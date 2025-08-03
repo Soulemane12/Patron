@@ -6,6 +6,7 @@ import { supabase, Customer } from '../lib/supabase';
 import InstallationCalendar from './components/InstallationCalendar';
 import DailyInstallations from './components/DailyInstallations';
 import Navbar from './components/Navbar';
+import StatsPage from './components/StatsPage';
 
 interface CustomerInfo {
   name: string;
@@ -602,6 +603,11 @@ export default function Home() {
 
 
 
+
+        {/* Stats Section */}
+        {activeSection === 'stats' && (
+          <StatsPage customers={customers} />
+        )}
 
         {/* Add New Lead Section */}
         {activeSection === 'add' && (
