@@ -89,7 +89,10 @@ If any information is missing, use "Not provided" as the value. Ensure the JSON 
       try {
         const date = new Date(formattedData.installationDate);
         if (!isNaN(date.getTime())) {
-          formattedData.installationDate = date.toISOString().split('T')[0];
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const dd = String(date.getDate()).padStart(2, '0');
+          formattedData.installationDate = `${yyyy}-${mm}-${dd}`;
         }
       } catch (error) {
         console.error('Error parsing date:', error);
