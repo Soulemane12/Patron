@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/check-installations",
-      "schedule": "52 14 * * *"
+      "schedule": "56 14 * * *"
     }
   ]
 } 
