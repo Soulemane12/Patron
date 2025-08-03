@@ -13,7 +13,7 @@ export default function Navbar({ activeSection, onSectionChange }: NavbarProps) 
       <div className="flex flex-wrap">
         <NavItem 
           id="calendar"
-          label="Calendar View" 
+          label="Calendar" 
           icon={
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
@@ -24,7 +24,7 @@ export default function Navbar({ activeSection, onSectionChange }: NavbarProps) 
         />
         <NavItem 
           id="pipeline"
-          label="Sales Pipeline" 
+          label="Pipeline" 
           icon={
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
@@ -36,7 +36,7 @@ export default function Navbar({ activeSection, onSectionChange }: NavbarProps) 
         />
         <NavItem 
           id="add"
-          label="Add New Lead" 
+          label="Add Lead" 
           icon={
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
@@ -63,14 +63,14 @@ function NavItem({ id, label, icon, isActive, onClick }: NavItemProps) {
     <button
       id={id}
       onClick={onClick}
-      className={`flex items-center px-6 py-4 text-sm font-medium transition-colors duration-150 border-b-2 flex-grow md:flex-grow-0 ${
+      className={`flex flex-col md:flex-row items-center justify-center px-3 py-3 md:px-6 md:py-4 text-xs md:text-sm font-medium transition-colors duration-150 border-b-2 flex-1 ${
         isActive
           ? 'text-blue-600 border-blue-500 bg-blue-50'
           : 'text-gray-700 border-transparent hover:text-blue-500 hover:bg-blue-50'
       }`}
     >
-      <span className="mr-2">{icon}</span>
-      {label}
+      <span className="mb-1 md:mb-0 md:mr-2">{icon}</span>
+      <span>{label}</span>
     </button>
   );
 }

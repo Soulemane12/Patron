@@ -87,11 +87,20 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
           box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
           font-family: inherit;
           color: black;
+          max-width: 100%;
+          overflow: hidden;
         }
         .react-calendar__tile {
-          padding: 1em 0.5em;
+          padding: 0.5em 0.3em;
           position: relative;
           color: black;
+          font-size: 0.9rem;
+        }
+        @media (min-width: 768px) {
+          .react-calendar__tile {
+            padding: 1em 0.5em;
+            font-size: 1rem;
+          }
         }
         .react-calendar__tile--now {
           background: #f0f9ff;
@@ -113,9 +122,15 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
           color: black;
         }
         .react-calendar__navigation button {
-          font-size: 1rem;
-          padding: 0.5rem;
+          font-size: 0.9rem;
+          padding: 0.3rem;
           color: black;
+        }
+        @media (min-width: 768px) {
+          .react-calendar__navigation button {
+            font-size: 1rem;
+            padding: 0.5rem;
+          }
         }
         .react-calendar__navigation button:hover {
           background-color: #e0e7ff;
@@ -123,6 +138,12 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
         .react-calendar__month-view__weekdays {
           color: black;
           font-weight: bold;
+          font-size: 0.8rem;
+        }
+        @media (min-width: 768px) {
+          .react-calendar__month-view__weekdays {
+            font-size: 0.9rem;
+          }
         }
         .react-calendar__month-view__days__day {
           color: black;
