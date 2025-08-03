@@ -125,7 +125,7 @@ export default function Home() {
         const data = await response.json();
         setCronSchedule(data.schedule);
         setNewCronSchedule(estCronString);
-        setScheduleStatus('✅ Schedule updated! Deploy to apply changes.');
+        setScheduleStatus('✅ Schedule updated in memory! (This is temporary - will reset on function restart)');
       } else {
         const errorData = await response.json();
         setScheduleStatus(`❌ Failed to update schedule: ${errorData.error || 'Unknown error'}`);
