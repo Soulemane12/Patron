@@ -16,7 +16,7 @@ export default function DailyInstallations({ date, installations }: DailyInstall
   return (
     <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mt-4">
       <h3 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 text-blue-800">
-        Installations for {formattedDate}
+        Schedule for {formattedDate}
       </h3>
       
       {installations.length === 0 ? (
@@ -31,12 +31,6 @@ export default function DailyInstallations({ date, installations }: DailyInstall
               </p>
               <p className="text-sm md:text-base text-black">
                 <span className="font-medium">Address:</span> {customer.service_address}
-              </p>
-              <p className="text-sm md:text-base text-black">
-                <span className="font-medium">Phone:</span> {customer.phone}
-              </p>
-              <p className="text-sm md:text-base text-black">
-                <span className="font-medium">Email:</span> {customer.email}
               </p>
             </div>
           ))}
