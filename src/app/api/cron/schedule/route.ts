@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Read current config
-    let config = {};
+    let config: any = {};
     if (fs.existsSync(vercelConfigPath)) {
       config = JSON.parse(fs.readFileSync(vercelConfigPath, 'utf8'));
     }
