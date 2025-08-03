@@ -115,6 +115,7 @@ export default function Home() {
             service_address: formattedInfo.serviceAddress,
             installation_date: formattedInfo.installationDate,
             installation_time: formattedInfo.installationTime,
+            status: 'active', // Default status for new customers
           },
         ])
         .select();
@@ -192,6 +193,9 @@ export default function Home() {
 
     setIsUpdating(true);
     try {
+      // Set default status to 'active' if not specified
+      const status = editingCustomer.status || 'active';
+      
       const { error } = await supabase
         .from('customers')
         .update({
@@ -201,6 +205,7 @@ export default function Home() {
           service_address: editingCustomer.service_address,
           installation_date: editingCustomer.installation_date,
           installation_time: editingCustomer.installation_time,
+          status: status,
         })
         .eq('id', editingCustomer.id);
 
@@ -232,11 +237,20 @@ export default function Home() {
       );
     }
     
-    // Apply date filter
+    // Apply status and date filters
     const today = new Date();
     const todayString = today.toISOString().split('T')[0];
     
-    if (filter === 'upcoming') {
+    // Status filters
+    if (filter === 'active') {
+      filtered = filtered.filter(customer => customer.status === 'active' || customer.status === undefined);
+    } else if (filter === 'cancelled') {
+      filtered = filtered.filter(customer => customer.status === 'cancelled');
+    } else if (filter === 'completed') {
+      filtered = filtered.filter(customer => customer.status === 'completed');
+    } 
+    // Date filters
+    else if (filter === 'upcoming') {
       filtered = filtered.filter(customer => customer.installation_date >= todayString);
     } else if (filter === 'past') {
       filtered = filtered.filter(customer => customer.installation_date < todayString);
@@ -279,6 +293,12 @@ export default function Home() {
         case 'email':
           aValue = a.email.toLowerCase();
           bValue = b.email.toLowerCase();
+          break;
+        case 'status':
+          // Define an order for statuses: cancelled first, then completed, then active
+          const statusOrder = { 'cancelled': 1, 'completed': 2, 'active': 3, 'undefined': 4 };
+          aValue = statusOrder[a.status || 'undefined'];
+          bValue = statusOrder[b.status || 'undefined'];
           break;
         default:
           aValue = a.created_at;
@@ -403,6 +423,9 @@ export default function Home() {
                   className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Customers</option>
+                  <option value="active">Active Customers</option>
+                  <option value="cancelled">Cancelled Customers</option>
+                  <option value="completed">Completed Installations</option>
                   <option value="upcoming">Upcoming Installations</option>
                   <option value="past">Past Installations</option>
                   <option value="this_week">This Week</option>
@@ -421,6 +444,7 @@ export default function Home() {
                   <option value="created_at">Date Added</option>
                   <option value="name">Name</option>
                   <option value="installation_date">Installation Date</option>
+                  <option value="status">Status</option>
                   <option value="email">Email</option>
                 </select>
               </div>
@@ -460,6 +484,21 @@ export default function Home() {
                         <div className="mb-3">
                           <h3 className="font-semibold text-base md:text-lg text-blue-800 mb-2">Edit Customer Details</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs md:text-sm font-medium text-black mb-1">Status</label>
+                              <select
+                                value={editingCustomer.status || 'active'}
+                                onChange={(e) => setEditingCustomer({ 
+                                  ...editingCustomer, 
+                                  status: e.target.value as 'active' | 'cancelled' | 'completed' 
+                                })}
+                                className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                              >
+                                <option value="active">Active</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="completed">Completed</option>
+                              </select>
+                            </div>
                             <div>
                               <label className="block text-xs md:text-sm font-medium text-black mb-1">Name</label>
                               <input
@@ -538,7 +577,20 @@ export default function Home() {
                       <>
                         <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-3">
                           <div>
-                            <h3 className="font-semibold text-base md:text-lg text-black">{customer.name}</h3>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-base md:text-lg text-black">{customer.name}</h3>
+                              {customer.status && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  customer.status === 'active' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : customer.status === 'cancelled'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-sm md:text-base text-black">{customer.email}</p>
                             <p className="text-sm md:text-base text-black">{customer.phone}</p>
                             <p className="text-sm md:text-base text-black">{customer.service_address}</p>

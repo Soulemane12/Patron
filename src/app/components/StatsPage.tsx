@@ -17,6 +17,9 @@ export default function StatsPage({ customers }: StatsPageProps) {
   const [upcomingInstallations, setUpcomingInstallations] = useState<number>(0);
   const [pastInstallations, setPastInstallations] = useState<number>(0);
   const [thisMonthInstallations, setThisMonthInstallations] = useState<number>(0);
+  const [activeCustomers, setActiveCustomers] = useState<number>(0);
+  const [cancelledCustomers, setCancelledCustomers] = useState<number>(0);
+  const [completedCustomers, setCompletedCustomers] = useState<number>(0);
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
   const [mostPopularDay, setMostPopularDay] = useState<string>('');
   const [topAreas, setTopAreas] = useState<{area: string, count: number}[]>([]);
@@ -47,6 +50,16 @@ export default function StatsPage({ customers }: StatsPageProps) {
       return installDate.getMonth() === currentMonth && installDate.getFullYear() === currentYear;
     });
     setThisMonthInstallations(thisMonth.length);
+    
+    // Status statistics
+    const active = customers.filter(c => c.status === 'active' || c.status === undefined);
+    setActiveCustomers(active.length);
+    
+    const cancelled = customers.filter(c => c.status === 'cancelled');
+    setCancelledCustomers(cancelled.length);
+    
+    const completed = customers.filter(c => c.status === 'completed');
+    setCompletedCustomers(completed.length);
     
     // Calculate monthly stats for the last 6 months
     const monthlyData: MonthlyStats[] = [];
@@ -194,7 +207,54 @@ export default function StatsPage({ customers }: StatsPageProps) {
         </div>
       </div>
       
-      {/* Conversion Rate */}
+      {/* Status Breakdown */}
+      <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+        <h3 className="text-md font-semibold mb-3 text-gray-700">Customer Status Breakdown</h3>
+        
+        {/* Active Customers */}
+        <div className="mb-3">
+          <div className="flex justify-between mb-1">
+            <span className="text-sm font-medium text-black">Active Customers</span>
+            <span className="text-sm font-medium text-black">{activeCustomers} ({totalCustomers > 0 ? Math.round((activeCustomers / totalCustomers) * 100) : 0}%)</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div 
+              className="bg-green-600 h-2.5 rounded-full" 
+              style={{ width: `${totalCustomers > 0 ? (activeCustomers / totalCustomers) * 100 : 0}%` }}
+            ></div>
+          </div>
+        </div>
+        
+        {/* Completed Customers */}
+        <div className="mb-3">
+          <div className="flex justify-between mb-1">
+            <span className="text-sm font-medium text-black">Completed Installations</span>
+            <span className="text-sm font-medium text-black">{completedCustomers} ({totalCustomers > 0 ? Math.round((completedCustomers / totalCustomers) * 100) : 0}%)</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div 
+              className="bg-blue-600 h-2.5 rounded-full" 
+              style={{ width: `${totalCustomers > 0 ? (completedCustomers / totalCustomers) * 100 : 0}%` }}
+            ></div>
+          </div>
+        </div>
+        
+        {/* Cancelled Customers */}
+        <div>
+          <div className="flex justify-between mb-1">
+            <span className="text-sm font-medium text-black">Cancelled Customers</span>
+            <span className="text-sm font-medium text-black">{cancelledCustomers} ({totalCustomers > 0 ? Math.round((cancelledCustomers / totalCustomers) * 100) : 0}%)</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div 
+              className="bg-red-600 h-2.5 rounded-full" 
+              style={{ width: `${totalCustomers > 0 ? (cancelledCustomers / totalCustomers) * 100 : 0}%` }}
+            ></div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Customer Growth */}
       <div className="mt-6 bg-gray-50 p-4 rounded-lg">
         <h3 className="text-md font-semibold mb-2 text-gray-700">Customer Growth</h3>
         <div className="flex items-center">

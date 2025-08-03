@@ -15,6 +15,7 @@ export interface Customer {
   installation_time: string;
   created_at: string;
   updated_at: string;
+  status?: 'active' | 'cancelled' | 'completed';
 }
 
 export interface EmailNotification {
