@@ -117,6 +117,8 @@ async function sendEmailNotification(customer: any, notificationType: string) {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('send-email failed', response.status, errorText);
       throw new Error('Failed to send email');
     }
   } catch (error) {
