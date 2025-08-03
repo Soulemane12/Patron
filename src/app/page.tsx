@@ -30,10 +30,7 @@ export default function Home() {
   const [newCronSchedule, setNewCronSchedule] = useState('');
   const [cronParts, setCronParts] = useState({
     minute: '0',
-    hour: '9',
-    day: '*',
-    month: '*',
-    weekday: '*'
+    hour: '9'
   });
   const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
   const [scheduleStatus, setScheduleStatus] = useState('');
@@ -96,10 +93,7 @@ export default function Home() {
         if (parts.length === 5) {
           setCronParts({
             minute: parts[0],
-            hour: parts[1],
-            day: parts[2],
-            month: parts[3],
-            weekday: parts[4]
+            hour: parts[1]
           });
         }
       }
@@ -113,8 +107,8 @@ export default function Home() {
     setScheduleStatus('');
     
     try {
-      // Build cron string from parts
-      const estCronString = `${cronParts.minute} ${cronParts.hour} ${cronParts.day} ${cronParts.month} ${cronParts.weekday}`;
+      // Build cron string from parts (always daily emails)
+      const estCronString = `${cronParts.minute} ${cronParts.hour} * * *`;
       
       // Convert EST input to UTC for storage
       const utcSchedule = estToUtc(estCronString);
@@ -145,23 +139,10 @@ export default function Home() {
 
   // Generate preview of what the cron will do
   const getCronPreview = () => {
-    const estCronString = `${cronParts.minute} ${cronParts.hour} ${cronParts.day} ${cronParts.month} ${cronParts.weekday}`;
+    const estCronString = `${cronParts.minute} ${cronParts.hour} * * *`;
     const utcCronString = estToUtc(estCronString);
     
-    let preview = '';
-    
-    // Simple preview logic
-    if (cronParts.day === '*' && cronParts.month === '*' && cronParts.weekday === '*') {
-      preview = `Daily at ${cronParts.hour}:${cronParts.minute.padStart(2, '0')} EST`;
-    } else if (cronParts.weekday !== '*') {
-      const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const dayIndex = parseInt(cronParts.weekday);
-      if (dayIndex >= 0 && dayIndex <= 6) {
-        preview = `Every ${weekdays[dayIndex]} at ${cronParts.hour}:${cronParts.minute.padStart(2, '0')} EST`;
-      }
-    } else {
-      preview = `Custom schedule: ${estCronString}`;
-    }
+    const preview = `Daily at ${cronParts.hour}:${cronParts.minute.padStart(2, '0')} EST`;
     
     return {
       est: estCronString,
@@ -326,7 +307,7 @@ export default function Home() {
           <p className="text-gray-600 mb-2">Current schedule (EST): <span className="font-mono bg-gray-100 px-2 py-1 rounded">{utcToEst(cronSchedule)}</span></p>
           
           {/* Cron Parts Input */}
-          <div className="grid grid-cols-5 gap-4 mb-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Minute</label>
               <input
@@ -344,36 +325,6 @@ export default function Home() {
                 value={cronParts.hour}
                 onChange={(e) => setCronParts({...cronParts, hour: e.target.value})}
                 placeholder="9"
-                className="w-full p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-center"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Day</label>
-              <input
-                type="text"
-                value={cronParts.day}
-                onChange={(e) => setCronParts({...cronParts, day: e.target.value})}
-                placeholder="*"
-                className="w-full p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-center"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
-              <input
-                type="text"
-                value={cronParts.month}
-                onChange={(e) => setCronParts({...cronParts, month: e.target.value})}
-                placeholder="*"
-                className="w-full p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-center"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Weekday</label>
-              <input
-                type="text"
-                value={cronParts.weekday}
-                onChange={(e) => setCronParts({...cronParts, weekday: e.target.value})}
-                placeholder="*"
                 className="w-full p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-center"
               />
             </div>
@@ -398,7 +349,7 @@ export default function Home() {
               {isUpdatingSchedule ? <LoadingSpinner /> : null}
               Update Schedule
             </button>
-            <p className="text-xs text-gray-500">* = every, 0-6 = Sunday-Saturday, 1-31 = day of month</p>
+            <p className="text-xs text-gray-500">Daily email reminders at the specified time</p>
           </div>
           {scheduleStatus && (
             <p className={`mt-2 ${scheduleStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
