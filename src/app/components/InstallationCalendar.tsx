@@ -86,13 +86,16 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
           border-radius: 0.5rem;
           box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
           font-family: inherit;
+          color: black;
         }
         .react-calendar__tile {
           padding: 1em 0.5em;
           position: relative;
+          color: black;
         }
         .react-calendar__tile--now {
           background: #f0f9ff;
+          color: black;
         }
         .react-calendar__tile--active {
           background: #dbeafe !important;
@@ -101,16 +104,31 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
         .has-installations {
           background-color: #f0f9ff;
           font-weight: bold;
+          color: black;
         }
         .react-calendar__tile:hover {
           background-color: #e0e7ff;
         }
+        .react-calendar__navigation {
+          color: black;
+        }
         .react-calendar__navigation button {
           font-size: 1rem;
           padding: 0.5rem;
+          color: black;
         }
         .react-calendar__navigation button:hover {
           background-color: #e0e7ff;
+        }
+        .react-calendar__month-view__weekdays {
+          color: black;
+          font-weight: bold;
+        }
+        .react-calendar__month-view__days__day {
+          color: black;
+        }
+        .react-calendar__month-view__days__day--neighboringMonth {
+          color: #666666;
         }
       `}</style>
       <Calendar

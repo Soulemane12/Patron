@@ -20,22 +20,22 @@ export default function DailyInstallations({ date, installations }: DailyInstall
       </h3>
       
       {installations.length === 0 ? (
-        <p className="text-gray-500">No installations scheduled for this date.</p>
+        <p className="text-black">No installations scheduled for this date.</p>
       ) : (
         <div className="space-y-4">
           {installations.map(customer => (
             <div key={customer.id} className="border-l-4 border-blue-500 pl-4 py-2">
-              <h4 className="font-semibold text-lg">{customer.name}</h4>
-              <p className="text-gray-700">
+              <h4 className="font-semibold text-lg text-black">{customer.name}</h4>
+              <p className="text-black">
                 <span className="font-medium">Time:</span> {customer.installation_time}
               </p>
-              <p className="text-gray-700">
+              <p className="text-black">
                 <span className="font-medium">Address:</span> {customer.service_address}
               </p>
-              <p className="text-gray-700">
+              <p className="text-black">
                 <span className="font-medium">Phone:</span> {customer.phone}
               </p>
-              <p className="text-gray-700">
+              <p className="text-black">
                 <span className="font-medium">Email:</span> {customer.email}
               </p>
             </div>
