@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import LoadingSpinner from './components/LoadingSpinner';
 import { supabase, Customer } from '../lib/supabase';
+import InstallationCalendar from './components/InstallationCalendar';
+import DailyInstallations from './components/DailyInstallations';
 
 interface CustomerInfo {
   name: string;
@@ -28,6 +30,9 @@ export default function Home() {
   const [testEmailStatus, setTestEmailStatus] = useState('');
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDateInstallations, setSelectedDateInstallations] = useState<Customer[]>([]);
+  const [showCalendarView, setShowCalendarView] = useState(false);
 
 
   // Calculate email notification dates
@@ -194,6 +199,15 @@ export default function Home() {
   const cancelEdit = () => {
     setEditingCustomer(null);
   };
+  
+  const handleDateClick = (date: Date, installations: Customer[]) => {
+    setSelectedDate(date);
+    setSelectedDateInstallations(installations);
+  };
+  
+  const toggleCalendarView = () => {
+    setShowCalendarView(!showCalendarView);
+  };
 
   const updateCustomer = async () => {
     if (!editingCustomer) return;
@@ -235,11 +249,49 @@ export default function Home() {
             Sales Pro Tracker
           </h1>
           <p className="text-gray-600">Your door-to-door sales assistant for managing customers and follow-ups</p>
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={toggleCalendarView}
+              className={`px-4 py-2 rounded-lg mr-2 ${showCalendarView 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-800'}`}
+            >
+              Calendar View
+            </button>
+            <button
+              onClick={() => setShowCalendarView(false)}
+              className={`px-4 py-2 rounded-lg ${!showCalendarView 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-800'}`}
+            >
+              List View
+            </button>
+          </div>
         </div>
 
 
+        {/* Calendar View */}
+        {showCalendarView && customers.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500">
+              <h2 className="text-xl font-semibold mb-4 text-blue-800">Installation Calendar</h2>
+              <InstallationCalendar 
+                customers={customers} 
+                onDateClick={handleDateClick} 
+              />
+            </div>
+            
+            {selectedDate && (
+              <DailyInstallations 
+                date={selectedDate} 
+                installations={selectedDateInstallations} 
+              />
+            )}
+          </div>
+        )}
+
         {/* Saved Customers */}
-        {customers.length > 0 && (
+        {(!showCalendarView && customers.length > 0) && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-t-4 border-blue-500">
             <h2 className="text-xl font-semibold mb-4 text-blue-800">Your Sales Pipeline</h2>
             <div className="space-y-4">
