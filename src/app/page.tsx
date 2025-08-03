@@ -26,8 +26,7 @@ export default function Home() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
-  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
-  const [testEmailStatus, setTestEmailStatus] = useState('');
+
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -53,43 +52,7 @@ export default function Home() {
 
 
 
-  const sendTestEmail = async () => {
-    setIsSendingTestEmail(true);
-    setTestEmailStatus('');
-    
-    try {
-      const testCustomer = {
-        name: "Test Customer",
-        email: "test@example.com",
-        phone: "555-123-4567",
-        service_address: "123 Test Street, Test City, NC 27302",
-        installation_date: "2024-12-25",
-        installation_time: "2:00 PM"
-      };
 
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customer: testCustomer,
-          notificationType: 'day_before'
-        }),
-      });
-
-      if (response.ok) {
-        setTestEmailStatus('✅ Test email sent successfully! Check your inbox.');
-      } else {
-        const errorData = await response.json();
-        setTestEmailStatus(`❌ Failed to send test email: ${errorData.message || 'Unknown error'}`);
-      }
-    } catch (error) {
-      setTestEmailStatus(`❌ Error sending test email: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsSendingTestEmail(false);
-    }
-  };
 
   const formatCustomerInfo = async () => {
     if (!inputText.trim()) {
@@ -353,24 +316,7 @@ export default function Home() {
           </div>
         )}
         
-        {/* Test Email Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-blue-800">Email Notification Test</h2>
-          <p className="text-gray-600 mb-4">Verify that your automated follow-up system is working correctly by sending a test email to your inbox.</p>
-          <button
-            onClick={sendTestEmail}
-            disabled={isSendingTestEmail}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            {isSendingTestEmail ? <LoadingSpinner /> : null}
-            Send Test Email
-          </button>
-          {testEmailStatus && (
-            <p className={`mt-2 ${testEmailStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
-              {testEmailStatus}
-            </p>
-          )}
-        </div>
+
 
         {/* Edit Customer Form */}
         {editingCustomer && (
