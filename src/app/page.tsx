@@ -28,6 +28,7 @@ export default function Home() {
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -165,12 +166,12 @@ export default function Home() {
   };
 
   const startEditingCustomer = (customer: Customer) => {
+    setEditingCustomerId(customer.id);
     setEditingCustomer(customer);
-    // Scroll to top to show edit form
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const cancelEdit = () => {
+    setEditingCustomerId(null);
     setEditingCustomer(null);
   };
   
@@ -207,6 +208,7 @@ export default function Home() {
 
       if (error) throw error;
 
+      setEditingCustomerId(null);
       setEditingCustomer(null);
       loadCustomers();
     } catch (error) {
@@ -453,55 +455,142 @@ export default function Home() {
               <div className="space-y-4">
                 {filteredCustomers.map((customer) => {
                 const emailSchedule = getEmailSchedule(customer.installation_date);
+                const isEditing = editingCustomerId === customer.id;
+                
                 return (
-                  <div key={customer.id} className="border border-gray-200 rounded-lg p-3 md:p-4 hover:shadow-md transition-shadow">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-3">
-                      <div>
-                        <h3 className="font-semibold text-base md:text-lg text-black">{customer.name}</h3>
-                        <p className="text-sm md:text-base text-black">{customer.email}</p>
-                        <p className="text-sm md:text-base text-black">{customer.phone}</p>
-                        <p className="text-sm md:text-base text-black">{customer.service_address}</p>
-                        <p className="text-sm md:text-base text-black">
-                          <span className="font-medium">Installation:</span> {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
-                        </p>
-                      </div>
-                      <div className="flex gap-2 mt-2 md:mt-0">
-                        <button
-                          onClick={() => startEditingCustomer(customer)}
-                          className="px-3 py-1 bg-blue-500 text-white rounded text-xs md:text-sm hover:bg-blue-600"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteCustomer(customer.id)}
-                          className="px-3 py-1 bg-red-500 text-white rounded text-xs md:text-sm hover:bg-red-600"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Email Schedule */}
-                    <div className="bg-blue-50 rounded-lg p-2 md:p-3">
-                      <h4 className="font-medium text-sm md:text-base text-black mb-2">Follow-up Reminders:</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs md:text-sm">
-                        <div className="flex items-center gap-1 md:gap-2">
-                          <span className="w-2 h-2 md:w-3 md:h-3 bg-yellow-400 rounded-full"></span>
-                          <span className="text-black">Pre-Install:</span>
-                          <span className="font-medium text-black">{emailSchedule.dayBefore}</span>
+                  <div key={customer.id} className={`border rounded-lg p-3 md:p-4 transition-shadow ${isEditing ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 hover:shadow-md'}`}>
+                    {isEditing ? (
+                      // Edit Mode
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-semibold text-lg text-black">Edit Customer</h3>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={updateCustomer}
+                              disabled={isUpdating}
+                              className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:opacity-50"
+                            >
+                              {isUpdating ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 md:gap-2">
-                          <span className="w-2 h-2 md:w-3 md:h-3 bg-green-400 rounded-full"></span>
-                          <span className="text-black">Install Day:</span>
-                          <span className="font-medium text-black">{emailSchedule.dayOf}</span>
-                        </div>
-                        <div className="flex items-center gap-1 md:gap-2">
-                          <span className="w-2 h-2 md:w-3 md:h-3 bg-blue-400 rounded-full"></span>
-                          <span className="text-black">Follow-up:</span>
-                          <span className="font-medium text-black">{emailSchedule.followUp}</span>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-black mb-1">Name</label>
+                            <input
+                              type="text"
+                              value={editingCustomer?.name || ''}
+                              onChange={(e) => editingCustomer && setEditingCustomer({ ...editingCustomer, name: e.target.value })}
+                              className="w-full p-2 border border-gray-300 rounded text-black"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-black mb-1">Email</label>
+                            <input
+                              type="email"
+                              value={editingCustomer?.email || ''}
+                              onChange={(e) => editingCustomer && setEditingCustomer({ ...editingCustomer, email: e.target.value })}
+                              className="w-full p-2 border border-gray-300 rounded text-black"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-black mb-1">Phone</label>
+                            <input
+                              type="text"
+                              value={editingCustomer?.phone || ''}
+                              onChange={(e) => editingCustomer && setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
+                              className="w-full p-2 border border-gray-300 rounded text-black"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-black mb-1">Installation Date</label>
+                            <input
+                              type="date"
+                              value={editingCustomer?.installation_date || ''}
+                              onChange={(e) => editingCustomer && setEditingCustomer({ ...editingCustomer, installation_date: e.target.value })}
+                              className="w-full p-2 border border-gray-300 rounded text-black"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-black mb-1">Service Address</label>
+                            <input
+                              type="text"
+                              value={editingCustomer?.service_address || ''}
+                              onChange={(e) => editingCustomer && setEditingCustomer({ ...editingCustomer, service_address: e.target.value })}
+                              className="w-full p-2 border border-gray-300 rounded text-black"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-black mb-1">Installation Time</label>
+                            <input
+                              type="text"
+                              value={editingCustomer?.installation_time || ''}
+                              onChange={(e) => editingCustomer && setEditingCustomer({ ...editingCustomer, installation_time: e.target.value })}
+                              className="w-full p-2 border border-gray-300 rounded text-black"
+                              placeholder="e.g., 2-4 p.m."
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      // View Mode
+                      <>
+                        <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-3">
+                          <div>
+                            <h3 className="font-semibold text-base md:text-lg text-black">{customer.name}</h3>
+                            <p className="text-sm md:text-base text-black">{customer.email}</p>
+                            <p className="text-sm md:text-base text-black">{customer.phone}</p>
+                            <p className="text-sm md:text-base text-black">{customer.service_address}</p>
+                            <p className="text-sm md:text-base text-black">
+                              <span className="font-medium">Installation:</span> {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
+                            </p>
+                          </div>
+                          <div className="flex gap-2 mt-2 md:mt-0">
+                            <button
+                              onClick={() => startEditingCustomer(customer)}
+                              className="px-3 py-1 bg-blue-500 text-white rounded text-xs md:text-sm hover:bg-blue-600"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => deleteCustomer(customer.id)}
+                              className="px-3 py-1 bg-red-500 text-white rounded text-xs md:text-sm hover:bg-red-600"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Email Schedule */}
+                        <div className="bg-blue-50 rounded-lg p-2 md:p-3">
+                          <h4 className="font-medium text-sm md:text-base text-black mb-2">Follow-up Reminders:</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs md:text-sm">
+                            <div className="flex items-center gap-1 md:gap-2">
+                              <span className="w-2 h-2 md:w-3 md:h-3 bg-yellow-400 rounded-full"></span>
+                              <span className="text-black">Pre-Install:</span>
+                              <span className="font-medium text-black">{emailSchedule.dayBefore}</span>
+                            </div>
+                            <div className="flex items-center gap-1 md:gap-2">
+                              <span className="w-2 h-2 md:w-3 md:h-3 bg-green-400 rounded-full"></span>
+                              <span className="text-black">Install Day:</span>
+                              <span className="font-medium text-black">{emailSchedule.dayOf}</span>
+                            </div>
+                            <div className="flex items-center gap-1 md:gap-2">
+                              <span className="w-2 h-2 md:w-3 md:h-3 bg-blue-400 rounded-full"></span>
+                              <span className="text-black">Follow-up:</span>
+                              <span className="font-medium text-black">{emailSchedule.followUp}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}
@@ -519,84 +608,7 @@ export default function Home() {
         
 
 
-        {/* Edit Customer Form */}
-        {editingCustomer && (
-          <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8">
-            <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 text-blue-800">Update Customer Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs md:text-sm font-medium text-black mb-1">Name</label>
-                <input
-                  type="text"
-                  value={editingCustomer.name}
-                  onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
-                  className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                />
-              </div>
-              <div>
-                <label className="block text-xs md:text-sm font-medium text-black mb-1">Email</label>
-                <input
-                  type="email"
-                  value={editingCustomer.email}
-                  onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
-                  className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                />
-              </div>
-              <div>
-                <label className="block text-xs md:text-sm font-medium text-black mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={editingCustomer.phone}
-                  onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
-                  className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                />
-              </div>
-              <div>
-                <label className="block text-xs md:text-sm font-medium text-black mb-1">Service Address</label>
-                <input
-                  type="text"
-                  value={editingCustomer.service_address}
-                  onChange={(e) => setEditingCustomer({ ...editingCustomer, service_address: e.target.value })}
-                  className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                />
-              </div>
-              <div>
-                <label className="block text-xs md:text-sm font-medium text-black mb-1">Installation Date</label>
-                <input
-                  type="date"
-                  value={editingCustomer.installation_date}
-                  onChange={(e) => setEditingCustomer({ ...editingCustomer, installation_date: e.target.value })}
-                  className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                />
-              </div>
-              <div>
-                <label className="block text-xs md:text-sm font-medium text-black mb-1">Installation Time</label>
-                <input
-                  type="text"
-                  value={editingCustomer.installation_time}
-                  onChange={(e) => setEditingCustomer({ ...editingCustomer, installation_time: e.target.value })}
-                  className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 md:gap-4 mt-3 md:mt-4">
-              <button
-                onClick={updateCustomer}
-                disabled={isUpdating}
-                className="px-4 md:px-6 py-2 bg-green-600 text-white text-xs md:text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 md:gap-2"
-              >
-                {isUpdating ? <LoadingSpinner /> : null}
-                Update Customer
-              </button>
-              <button
-                onClick={cancelEdit}
-                className="px-4 md:px-6 py-2 bg-gray-500 text-white text-xs md:text-sm rounded-lg hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {/* Add New Lead Section */}
         {activeSection === 'add' && (
