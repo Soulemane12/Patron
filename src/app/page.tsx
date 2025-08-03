@@ -24,8 +24,6 @@ export default function Home() {
   const [showSaved, setShowSaved] = useState(false);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailStatus, setTestEmailStatus] = useState('');
-  const [isRunningCron, setIsRunningCron] = useState(false);
-  const [cronStatus, setCronStatus] = useState('');
 
   // Calculate email notification dates
   const getEmailSchedule = (installationDate: string) => {
@@ -78,27 +76,6 @@ export default function Home() {
       setTestEmailStatus(`❌ Error sending test email: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSendingTestEmail(false);
-    }
-  };
-  
-  const runCronJob = async () => {
-    setIsRunningCron(true);
-    setCronStatus('');
-    
-    try {
-      const response = await fetch('/api/cron/check-installations');
-      
-      if (response.ok) {
-        const data = await response.json();
-        setCronStatus(`✅ Cron job executed successfully! Found: ${data.today} installations today, ${data.tomorrow} tomorrow, ${data.followUp} follow-ups.`);
-      } else {
-        const errorData = await response.json();
-        setCronStatus(`❌ Failed to run cron job: ${errorData.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      setCronStatus(`❌ Error running cron job: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsRunningCron(false);
     }
   };
 
@@ -214,47 +191,21 @@ export default function Home() {
 
         {/* Test Email Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Test Email & Cron Functionality</h2>
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="flex-1">
-              <p className="text-black mb-2">Send a test email to verify email configuration:</p>
-              <button
-                onClick={sendTestEmail}
-                disabled={isSendingTestEmail}
-                className="w-full px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isSendingTestEmail ? <LoadingSpinner /> : null}
-                Send Test Email
-              </button>
-              {testEmailStatus && (
-                <p className={`mt-2 ${testEmailStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
-                  {testEmailStatus}
-                </p>
-              )}
-            </div>
-            <div className="flex-1">
-              <p className="text-black mb-2">Run cron job manually to check for installations:</p>
-              <button
-                onClick={runCronJob}
-                disabled={isRunningCron}
-                className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isRunningCron ? <LoadingSpinner /> : null}
-                Run Cron Job Now
-              </button>
-              {cronStatus && (
-                <p className={`mt-2 ${cronStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
-                  {cronStatus}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="mt-4 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-            <p className="text-black text-sm">
-              <strong>Note:</strong> The cron job checks for customers with installations tomorrow (day before), today (day of), and 10 days ago (follow-up).
-              Current server date: <strong>{new Date().toLocaleDateString()}</strong>
+          <h2 className="text-xl font-semibold mb-4">Test Email Functionality</h2>
+          <p className="text-gray-600 mb-4">Click the button below to send a test email and verify the email system is working.</p>
+          <button
+            onClick={sendTestEmail}
+            disabled={isSendingTestEmail}
+            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            {isSendingTestEmail ? <LoadingSpinner /> : null}
+            Send Test Email
+          </button>
+          {testEmailStatus && (
+            <p className={`mt-2 ${testEmailStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+              {testEmailStatus}
             </p>
-          </div>
+          )}
         </div>
 
           {/* Input Section */}

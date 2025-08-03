@@ -66,8 +66,8 @@ The system automatically sends emails to `Thechosen1351@gmail.com`:
    ```
 
 4. **Run the development server**
-   ```bash
-   npm run dev
+```bash
+npm run dev
    ```
 
 5. **Open the application**

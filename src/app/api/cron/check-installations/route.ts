@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabase';
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,7 +117,7 @@ async function sendEmailNotification(customer: any, notificationType: string) {
 
 async function recordNotification(customerId: string, notificationType: string) {
   try {
-    await supabase
+    await supabaseAdmin
       .from('email_notifications')
       .insert([{
         customer_id: customerId,
