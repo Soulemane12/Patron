@@ -249,57 +249,57 @@ export default function Home() {
             <h2 className="text-xl font-semibold mb-4">Formatted Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-medium text-black mb-1">Name</label>
                 <input
                   type="text"
                   value={formattedInfo.name}
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, name: e.target.value })}
-                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-black mb-1">Email</label>
                 <input
                   type="email"
                   value={formattedInfo.email}
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, email: e.target.value })}
-                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <label className="block text-sm font-medium text-black mb-1">Phone</label>
                 <input
                   type="tel"
                   value={formattedInfo.phone}
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, phone: e.target.value })}
-                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Service Address</label>
+                <label className="block text-sm font-medium text-black mb-1">Service Address</label>
                 <input
                   type="text"
                   value={formattedInfo.serviceAddress}
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, serviceAddress: e.target.value })}
-                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Installation Date</label>
+                <label className="block text-sm font-medium text-black mb-1">Installation Date</label>
                 <input
                   type="date"
                   value={formattedInfo.installationDate}
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, installationDate: e.target.value })}
-                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Installation Time</label>
+                <label className="block text-sm font-medium text-black mb-1">Installation Time</label>
                 <input
                   type="text"
                   value={formattedInfo.installationTime}
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, installationTime: e.target.value })}
-                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
               </div>
             </div>
