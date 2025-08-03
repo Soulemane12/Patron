@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 
-const vercelConfigPath = path.join(process.cwd(), 'vercel.json');
+// Store the schedule in memory (will reset on function restart)
+let currentSchedule = '0 14 * * *';
 
 export async function GET() {
   try {
-    if (!fs.existsSync(vercelConfigPath)) {
-      return NextResponse.json({ error: 'vercel.json not found' }, { status: 404 });
-    }
-
-    const config = JSON.parse(fs.readFileSync(vercelConfigPath, 'utf8'));
-    const cronSchedule = config.crons?.[0]?.schedule || '0 14 * * *';
-
-    return NextResponse.json({ schedule: cronSchedule });
+    return NextResponse.json({ schedule: currentSchedule });
   } catch (error) {
     console.error('Error reading cron schedule:', error);
     return NextResponse.json({ error: 'Failed to read schedule' }, { status: 500 });
@@ -34,27 +26,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid cron format. Use format: minute hour day month weekday' }, { status: 400 });
     }
 
-    // Read current config
-    let config: any = {};
-    if (fs.existsSync(vercelConfigPath)) {
-      config = JSON.parse(fs.readFileSync(vercelConfigPath, 'utf8'));
-    }
-
-    // Update cron schedule
-    config.crons = [
-      {
-        path: '/api/cron/check-installations',
-        schedule: schedule
-      }
-    ];
-
-    // Write back to file
-    fs.writeFileSync(vercelConfigPath, JSON.stringify(config, null, 2));
+    // Update the schedule in memory
+    currentSchedule = schedule;
 
     return NextResponse.json({ 
       success: true, 
       schedule: schedule,
-      message: 'Schedule updated successfully. Deploy to apply changes.'
+      message: 'Schedule updated in memory. Note: This is temporary and will reset on deployment.'
     });
 
   } catch (error) {

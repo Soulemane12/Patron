@@ -303,6 +303,12 @@ export default function Home() {
         {/* Cron Schedule Management */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Cron Schedule Management</h2>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <p className="text-yellow-800 text-sm">
+              <strong>Note:</strong> This is a temporary preview feature. To permanently change the cron schedule, 
+              edit the <code className="bg-yellow-100 px-1 rounded">vercel.json</code> file directly.
+            </p>
+          </div>
           <p className="text-gray-600 mb-4">Current schedule (UTC): <span className="font-mono bg-gray-100 px-2 py-1 rounded">{cronSchedule}</span></p>
           <p className="text-gray-600 mb-2">Current schedule (EST): <span className="font-mono bg-gray-100 px-2 py-1 rounded">{utcToEst(cronSchedule)}</span></p>
           
@@ -349,7 +355,7 @@ export default function Home() {
               {isUpdatingSchedule ? <LoadingSpinner /> : null}
               Update Schedule
             </button>
-            <p className="text-xs text-gray-500">Daily email reminders at the specified time</p>
+            <p className="text-xs text-gray-500">Daily email reminders at the specified time (temporary preview)</p>
           </div>
           {scheduleStatus && (
             <p className={`mt-2 ${scheduleStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
