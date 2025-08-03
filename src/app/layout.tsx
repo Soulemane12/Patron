@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Customer Information Formatter",
-  description: "Automatically format customer information and installation details using AI",
+  title: "Sales Pro Tracker",
+  description: "Track your door-to-door sales, manage customer information, and get automated follow-up reminders",
 };
 
 export default function RootLayout({

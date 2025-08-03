@@ -228,22 +228,87 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-          Customer Management System
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-blue-800 mb-2">
+            Sales Pro Tracker
           </h1>
+          <p className="text-gray-600">Your door-to-door sales assistant for managing customers and follow-ups</p>
+        </div>
 
 
-
+        {/* Saved Customers */}
+        {customers.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-t-4 border-blue-500">
+            <h2 className="text-xl font-semibold mb-4 text-blue-800">Your Sales Pipeline</h2>
+            <div className="space-y-4">
+              {customers.map((customer) => {
+                const emailSchedule = getEmailSchedule(customer.installation_date);
+                return (
+                  <div key={customer.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-semibold text-lg text-black">{customer.name}</h3>
+                        <p className="text-black">{customer.email}</p>
+                        <p className="text-black">{customer.phone}</p>
+                        <p className="text-black">{customer.service_address}</p>
+                        <p className="text-black">
+                          <span className="font-medium">Installation:</span> {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => startEditingCustomer(customer)}
+                          className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteCustomer(customer.id)}
+                          className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Email Schedule */}
+                    <div className="bg-blue-50 rounded-lg p-3">
+                      <h4 className="font-medium text-black mb-2">Follow-up Reminders:</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 bg-yellow-400 rounded-full"></span>
+                          <span className="text-black">Pre-Install:</span>
+                          <span className="font-medium text-black">{emailSchedule.dayBefore}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 bg-green-400 rounded-full"></span>
+                          <span className="text-black">Installation Day:</span>
+                          <span className="font-medium text-black">{emailSchedule.dayOf}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 bg-blue-400 rounded-full"></span>
+                          <span className="text-black">Post-Install Check:</span>
+                          <span className="font-medium text-black">{emailSchedule.followUp}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
         {/* Test Email Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Test Email Functionality</h2>
-          <p className="text-gray-600 mb-4">Click the button below to send a test email and verify the email system is working.</p>
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Email Notification Test</h2>
+          <p className="text-gray-600 mb-4">Verify that your automated follow-up system is working correctly by sending a test email to your inbox.</p>
           <button
             onClick={sendTestEmail}
             disabled={isSendingTestEmail}
-            className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
           >
             {isSendingTestEmail ? <LoadingSpinner /> : null}
             Send Test Email
@@ -253,12 +318,12 @@ export default function Home() {
               {testEmailStatus}
             </p>
           )}
-                </div>
+        </div>
 
         {/* Edit Customer Form */}
         {editingCustomer && (
           <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-xl font-semibold mb-4">Edit Customer Information</h2>
+            <h2 className="text-xl font-semibold mb-4 text-blue-800">Update Customer Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-black mb-1">Name</label>
@@ -335,22 +400,28 @@ export default function Home() {
         )}
 
         {/* Input Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Add Customer Information</h2>
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-t-4 border-green-500">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Add New Sales Lead</h2>
+          <p className="text-gray-600 mb-4">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
                 <textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-            placeholder="Paste customer information in any format..."
+            placeholder="Example: John Smith, phone 555-123-4567, email john@example.com, address 123 Main St, installation scheduled for June 15th at 2pm..."
             className="w-full h-32 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
           <div className="flex gap-4 mt-4">
                 <button
               onClick={formatCustomerInfo}
               disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
             >
               {isLoading ? <LoadingSpinner /> : null}
-              Format Information
+              <span className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Process Lead
+              </span>
                 </button>
                 <button
               onClick={clearForm}
@@ -364,8 +435,9 @@ export default function Home() {
 
         {/* Formatted Information */}
         {formattedInfo && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-xl font-semibold mb-4">Formatted Information</h2>
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8 border-t-4 border-purple-500">
+            <h2 className="text-xl font-semibold mb-4 text-blue-800">Review Lead Information</h2>
+            <p className="text-gray-600 mb-4">Verify the details below before saving this lead to your sales pipeline.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-black mb-1">Name</label>
@@ -428,7 +500,12 @@ export default function Home() {
               className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
             >
               {isSaving ? <LoadingSpinner /> : null}
-              Save Customer
+              <span className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z" />
+                </svg>
+                Add to Pipeline
+              </span>
             </button>
             {showSaved && (
               <p className="text-green-600 mt-2">Customer saved successfully!</p>
@@ -454,7 +531,7 @@ export default function Home() {
                         <p className="text-black">
                           Installation: {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
                         </p>
-                                          </div>
+                    </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => startEditingCustomer(customer)}
@@ -468,7 +545,7 @@ export default function Home() {
                         >
                           Delete
                         </button>
-                      </div>
+                    </div>
                     </div>
                     
                     {/* Email Schedule */}
