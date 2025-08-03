@@ -26,14 +26,7 @@ export default function Home() {
   const [showSaved, setShowSaved] = useState(false);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
   const [testEmailStatus, setTestEmailStatus] = useState('');
-  const [cronSchedule, setCronSchedule] = useState('');
-  const [newCronSchedule, setNewCronSchedule] = useState('');
-  const [cronParts, setCronParts] = useState({
-    minute: '0',
-    hour: '9'
-  });
-  const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
-  const [scheduleStatus, setScheduleStatus] = useState('');
+
 
   // Calculate email notification dates
   const getEmailSchedule = (installationDate: string) => {
@@ -51,105 +44,7 @@ export default function Home() {
     };
   };
 
-  // Convert UTC cron to EST time display
-  const utcToEst = (utcCron: string) => {
-    const parts = utcCron.split(' ');
-    if (parts.length === 5) {
-      const minute = parseInt(parts[0]);
-      const hour = parseInt(parts[1]);
-      // Convert UTC to EST (UTC-5) or EDT (UTC-4)
-      const estHour = (hour - 5 + 24) % 24; // EST is UTC-5
-      return `${minute} ${estHour} ${parts[2]} ${parts[3]} ${parts[4]}`;
-    }
-    return utcCron;
-  };
 
-  // Convert EST time to UTC cron
-  const estToUtc = (estCron: string) => {
-    const parts = estCron.split(' ');
-    if (parts.length === 5) {
-      const minute = parseInt(parts[0]);
-      const estHour = parseInt(parts[1]);
-      // Convert EST to UTC (EST+5)
-      const utcHour = (estHour + 5) % 24;
-      return `${minute} ${utcHour} ${parts[2]} ${parts[3]} ${parts[4]}`;
-    }
-    return estCron;
-  };
-
-  const loadCronSchedule = async () => {
-    try {
-      const response = await fetch('/api/cron/schedule');
-      if (response.ok) {
-        const data = await response.json();
-        const utcSchedule = data.schedule;
-        setCronSchedule(utcSchedule);
-        // Convert UTC to EST for display
-        const estSchedule = utcToEst(utcSchedule);
-        setNewCronSchedule(estSchedule);
-        
-        // Parse the EST schedule into parts
-        const parts = estSchedule.split(' ');
-        if (parts.length === 5) {
-          setCronParts({
-            minute: parts[0],
-            hour: parts[1]
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error loading cron schedule:', error);
-    }
-  };
-
-  const updateCronSchedule = async () => {
-    setIsUpdatingSchedule(true);
-    setScheduleStatus('');
-    
-    try {
-      // Build cron string from parts (always daily emails)
-      const estCronString = `${cronParts.minute} ${cronParts.hour} * * *`;
-      
-      // Convert EST input to UTC for storage
-      const utcSchedule = estToUtc(estCronString);
-      
-      const response = await fetch('/api/cron/schedule', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ schedule: utcSchedule }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setCronSchedule(data.schedule);
-        setNewCronSchedule(estCronString);
-        setScheduleStatus('✅ Schedule updated in memory! (This is temporary - will reset on function restart)');
-      } else {
-        const errorData = await response.json();
-        setScheduleStatus(`❌ Failed to update schedule: ${errorData.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      setScheduleStatus(`❌ Error updating schedule: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsUpdatingSchedule(false);
-    }
-  };
-
-  // Generate preview of what the cron will do
-  const getCronPreview = () => {
-    const estCronString = `${cronParts.minute} ${cronParts.hour} * * *`;
-    const utcCronString = estToUtc(estCronString);
-    
-    const preview = `Daily at ${cronParts.hour}:${cronParts.minute.padStart(2, '0')} EST`;
-    
-    return {
-      est: estCronString,
-      utc: utcCronString,
-      preview: preview
-    };
-  };
 
   const sendTestEmail = async () => {
     setIsSendingTestEmail(true);
@@ -290,7 +185,6 @@ export default function Home() {
 
   useEffect(() => {
     loadCustomers();
-    loadCronSchedule();
   }, []);
 
   return (
@@ -300,69 +194,7 @@ export default function Home() {
           Customer Management System
         </h1>
 
-        {/* Cron Schedule Management */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Cron Schedule Management</h2>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-            <p className="text-yellow-800 text-sm">
-              <strong>Note:</strong> This is a temporary preview feature. To permanently change the cron schedule, 
-              edit the <code className="bg-yellow-100 px-1 rounded">vercel.json</code> file directly.
-            </p>
-          </div>
-          <p className="text-gray-600 mb-4">Current schedule (UTC): <span className="font-mono bg-gray-100 px-2 py-1 rounded">{cronSchedule}</span></p>
-          <p className="text-gray-600 mb-2">Current schedule (EST): <span className="font-mono bg-gray-100 px-2 py-1 rounded">{utcToEst(cronSchedule)}</span></p>
-          
-          {/* Cron Parts Input */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Minute</label>
-              <input
-                type="text"
-                value={cronParts.minute}
-                onChange={(e) => setCronParts({...cronParts, minute: e.target.value})}
-                placeholder="0"
-                className="w-full p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-center"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Hour (EST)</label>
-              <input
-                type="text"
-                value={cronParts.hour}
-                onChange={(e) => setCronParts({...cronParts, hour: e.target.value})}
-                placeholder="9"
-                className="w-full p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-center"
-              />
-            </div>
-          </div>
 
-          {/* Preview */}
-          <div className="bg-blue-50 rounded-lg p-4 mb-4">
-            <h3 className="font-medium text-gray-900 mb-2">Preview:</h3>
-            <div className="space-y-2 text-sm">
-              <p><span className="font-medium">EST Schedule:</span> <span className="font-mono bg-white px-2 py-1 rounded">{getCronPreview().est}</span></p>
-              <p><span className="font-medium">UTC Schedule:</span> <span className="font-mono bg-white px-2 py-1 rounded">{getCronPreview().utc}</span></p>
-              <p><span className="font-medium">Description:</span> <span className="text-blue-600">{getCronPreview().preview}</span></p>
-            </div>
-          </div>
-
-          <div className="flex gap-4 items-center">
-            <button
-              onClick={updateCronSchedule}
-              disabled={isUpdatingSchedule}
-              className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
-            >
-              {isUpdatingSchedule ? <LoadingSpinner /> : null}
-              Update Schedule
-            </button>
-            <p className="text-xs text-gray-500">Daily email reminders at the specified time (temporary preview)</p>
-          </div>
-          {scheduleStatus && (
-            <p className={`mt-2 ${scheduleStatus.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
-              {scheduleStatus}
-            </p>
-          )}
-        </div>
 
         {/* Test Email Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
