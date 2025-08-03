@@ -120,7 +120,7 @@ export default function Home() {
       loadCustomers();
       clearForm();
       
-      // Switch to pipeline view after saving
+      // Switch to customers view after saving
       setActiveSection('pipeline');
     } catch (error) {
       console.error('Error saving customer:', error);
@@ -226,7 +226,7 @@ export default function Home() {
         <Navbar activeSection={activeSection} onSectionChange={handleSectionChange} />
 
 
-        {/* Calendar View */}
+        {/* Calendar View - Only shows installations for the selected date */}
         {activeSection === 'calendar' && (
           <div className="mb-8">
             <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500">
