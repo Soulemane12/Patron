@@ -164,30 +164,30 @@ export default function StatsPage({ customers }: StatsPageProps) {
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-blue-50 p-4 rounded-lg text-center">
-          <p className="text-sm text-gray-600">Total Customers</p>
+          <p className="text-sm text-black">Total Customers</p>
           <p className="text-2xl font-bold text-blue-700">{totalCustomers}</p>
         </div>
         <div className="bg-green-50 p-4 rounded-lg text-center">
-          <p className="text-sm text-gray-600">Upcoming Installations</p>
+          <p className="text-sm text-black">Upcoming Installations</p>
           <p className="text-2xl font-bold text-green-700">{upcomingInstallations}</p>
         </div>
         <div className="bg-yellow-50 p-4 rounded-lg text-center">
-          <p className="text-sm text-gray-600">Completed Installations</p>
+          <p className="text-sm text-black">Completed Installations</p>
           <p className="text-2xl font-bold text-yellow-700">{pastInstallations}</p>
         </div>
         <div className="bg-purple-50 p-4 rounded-lg text-center">
-          <p className="text-sm text-gray-600">This Month</p>
+          <p className="text-sm text-black">This Month</p>
           <p className="text-2xl font-bold text-purple-700">{thisMonthInstallations}</p>
         </div>
         <div className="bg-pink-50 p-4 rounded-lg text-center">
-          <p className="text-sm text-gray-600">Total Referrals</p>
+          <p className="text-sm text-black">Total Referrals</p>
           <p className="text-2xl font-bold text-pink-700">{referralCustomers}</p>
         </div>
       </div>
       
       {/* Monthly Trend */}
       <div className="mb-6">
-        <h3 className="text-md font-semibold mb-3 text-gray-700">Monthly Installation Trend</h3>
+        <h3 className="text-md font-semibold mb-3 text-black">Monthly Installation Trend</h3>
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="flex items-end h-40 gap-2">
             {monthlyStats.map((stat, index) => {
@@ -200,8 +200,8 @@ export default function StatsPage({ customers }: StatsPageProps) {
                     className="w-full bg-blue-500 rounded-t"
                     style={{ height: `${height}%` }}
                   ></div>
-                  <p className="text-xs mt-1 text-gray-600">{stat.month}</p>
-                  <p className="text-xs font-semibold">{stat.count}</p>
+                  <p className="text-xs mt-1 text-black">{stat.month}</p>
+                  <p className="text-xs font-semibold text-black">{stat.count}</p>
                 </div>
               );
             })}
@@ -212,12 +212,12 @@ export default function StatsPage({ customers }: StatsPageProps) {
       {/* Additional Insights */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="text-md font-semibold mb-2 text-gray-700">Most Popular Day</h3>
+          <h3 className="text-md font-semibold mb-2 text-black">Most Popular Day</h3>
           <p className="text-black">{mostPopularDay || 'Not enough data'}</p>
         </div>
         
         <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="text-md font-semibold mb-2 text-gray-700">Top Service Areas</h3>
+          <h3 className="text-md font-semibold mb-2 text-black">Top Service Areas</h3>
           {topAreas.length > 0 ? (
             <ul className="text-black">
               {topAreas.map((area, index) => (
@@ -243,7 +243,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
           </div>
           <div>
             <p className="font-medium text-black">Total Referrals</p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-black">
               {totalCustomers > 0 ? Math.round((referralCustomers / totalCustomers) * 100) : 0}% of all customers
             </p>
           </div>
@@ -270,7 +270,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
       
       {/* Status Breakdown */}
       <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-        <h3 className="text-md font-semibold mb-3 text-gray-700">Customer Status Breakdown</h3>
+        <h3 className="text-md font-semibold mb-3 text-black">Customer Status Breakdown</h3>
         
         {/* Active Customers */}
         <div className="mb-3">
@@ -317,7 +317,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
       
       {/* Customer Growth */}
       <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-        <h3 className="text-md font-semibold mb-2 text-gray-700">Customer Growth</h3>
+        <h3 className="text-md font-semibold mb-2 text-black">Customer Growth</h3>
         <div className="flex items-center">
           <div className="flex-1">
             <div className="h-4 bg-gray-200 rounded-full">
@@ -331,7 +331,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
             {totalCustomers} total
           </span>
         </div>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-black mt-2">
           Keep adding customers to see your growth over time!
         </p>
       </div>

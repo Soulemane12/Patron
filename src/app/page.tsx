@@ -728,7 +728,7 @@ export default function Home() {
         {activeSection === 'add' && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8 border-t-4 border-green-500">
             <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4 text-blue-800">Add New Sales Lead</h2>
-            <p className="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
+            <p className="text-xs md:text-sm text-black mb-3 md:mb-4">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
@@ -764,7 +764,7 @@ export default function Home() {
         {activeSection === 'add' && formattedInfo && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8 border-t-4 border-purple-500">
             <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4 text-blue-800">Review Lead Information</h2>
-            <p className="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">Verify the details below before saving this lead to your sales pipeline.</p>
+            <p className="text-xs md:text-sm text-black mb-3 md:mb-4">Verify the details below before saving this lead to your sales pipeline.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                 <label className="block text-xs md:text-sm font-medium text-black mb-1">Name</label>

@@ -77,7 +77,7 @@ function NavItem({ id, label, icon, isActive, onClick }: NavItemProps) {
       className={`flex flex-col md:flex-row items-center justify-center px-3 py-3 md:px-6 md:py-4 text-xs md:text-sm font-medium transition-colors duration-150 border-b-2 flex-1 ${
         isActive
           ? 'text-blue-600 border-blue-500 bg-blue-50'
-          : 'text-gray-700 border-transparent hover:text-blue-500 hover:bg-blue-50'
+          : 'text-black border-transparent hover:text-blue-500 hover:bg-blue-50'
       }`}
     >
       <span className="mb-1 md:mb-0 md:mr-2">{icon}</span>
