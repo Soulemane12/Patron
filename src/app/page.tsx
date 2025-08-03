@@ -14,6 +14,8 @@ interface CustomerInfo {
 }
 
 export default function Home() {
+  // Parse a YYYY-MM-DD string as a local-timezone date (avoids UTC shift)
+  const parseDateLocal = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
   const [inputText, setInputText] = useState('');
   const [formattedInfo, setFormattedInfo] = useState<CustomerInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,8 +28,8 @@ export default function Home() {
   const [testEmailStatus, setTestEmailStatus] = useState('');
 
   // Calculate email notification dates
-  const getEmailSchedule = (installationDate: string) => {
-    const installDate = new Date(installationDate);
+    const getEmailSchedule = (installationDate: string) => {
+    const installDate = parseDateLocal(installationDate);
     const dayBefore = new Date(installDate);
     dayBefore.setDate(dayBefore.getDate() - 1);
     const dayOf = new Date(installDate);
@@ -326,7 +328,7 @@ export default function Home() {
                         <p className="text-black">{customer.phone}</p>
                         <p className="text-black">{customer.service_address}</p>
                         <p className="text-black">
-                          Installation: {new Date(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
+                          Installation: {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
                         </p>
                     </div>
                       <button
