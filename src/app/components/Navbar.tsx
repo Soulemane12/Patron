@@ -24,7 +24,7 @@ export default function Navbar({ activeSection, onSectionChange }: NavbarProps) 
         />
         <NavItem 
           id="pipeline"
-          label="Pipeline" 
+          label="Customers" 
           icon={
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />

@@ -250,10 +250,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* Sales Pipeline */}
+        {/* Sales Pipeline - Only shows saved customers */}
         {activeSection === 'pipeline' && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8 border-t-4 border-blue-500">
-            <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 text-blue-800">Your Sales Pipeline</h2>
+            <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 text-blue-800">Your Saved Customers</h2>
             {customers.length > 0 ? (
               <div className="space-y-4">
                 {customers.map((customer) => {
@@ -312,7 +312,7 @@ export default function Home() {
               })}
               </div>
             ) : (
-              <p className="text-center py-8 text-black">No customers in your pipeline yet. Add a new lead to get started.</p>
+              <p className="text-center py-8 text-black">No saved customers yet. Add a new lead to get started.</p>
             )}
           </div>
         )}
