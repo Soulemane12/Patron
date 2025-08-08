@@ -23,13 +23,13 @@ export async function GET(request: Request, context: any) {
 
     // Check if user has provider profile
     const { data: profile, error: profileError } = await supabaseAdmin
-      .from('users')
+      .from('provider_profiles')
       .select('user_type')
       .eq('id', providerId)
       .maybeSingle();
 
     if (profileError) {
-      console.error('Error loading user profile:', profileError);
+      console.error('Error loading provider profile:', profileError);
       return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
