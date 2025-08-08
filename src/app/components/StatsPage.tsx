@@ -166,23 +166,127 @@ export default function StatsPage({ customers }: StatsPageProps) {
       
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-blue-50 p-4 rounded-lg text-center">
+        <div
+          className="bg-blue-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setModalCustomers(customers);
+            setModalTitle(`Total Customers (${customers.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setModalCustomers(customers);
+              setModalTitle(`Total Customers (${customers.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <p className="text-sm text-black">Total Customers</p>
           <p className="text-2xl font-bold text-blue-700">{totalCustomers}</p>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg text-center">
+        <div
+          className="bg-green-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const todayString = new Date().toISOString().split('T')[0];
+            const list = customers.filter(c => c.installation_date >= todayString);
+            setModalCustomers(list);
+            setModalTitle(`Upcoming Installations (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const todayString = new Date().toISOString().split('T')[0];
+              const list = customers.filter(c => c.installation_date >= todayString);
+              setModalCustomers(list);
+              setModalTitle(`Upcoming Installations (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <p className="text-sm text-black">Upcoming Installations</p>
           <p className="text-2xl font-bold text-green-700">{upcomingInstallations}</p>
         </div>
-        <div className="bg-yellow-50 p-4 rounded-lg text-center">
+        <div
+          className="bg-yellow-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const todayString = new Date().toISOString().split('T')[0];
+            const list = customers.filter(c => c.installation_date < todayString);
+            setModalCustomers(list);
+            setModalTitle(`Completed Installations (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const todayString = new Date().toISOString().split('T')[0];
+              const list = customers.filter(c => c.installation_date < todayString);
+              setModalCustomers(list);
+              setModalTitle(`Completed Installations (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <p className="text-sm text-black">Completed Installations</p>
           <p className="text-2xl font-bold text-yellow-700">{pastInstallations}</p>
         </div>
-        <div className="bg-purple-50 p-4 rounded-lg text-center">
+        <div
+          className="bg-purple-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            const list = customers.filter(c => {
+              const d = new Date(c.installation_date);
+              return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            });
+            setModalCustomers(list);
+            setModalTitle(`This Month (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const now = new Date();
+              const currentMonth = now.getMonth();
+              const currentYear = now.getFullYear();
+              const list = customers.filter(c => {
+                const d = new Date(c.installation_date);
+                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+              });
+              setModalCustomers(list);
+              setModalTitle(`This Month (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <p className="text-sm text-black">This Month</p>
           <p className="text-2xl font-bold text-purple-700">{thisMonthInstallations}</p>
         </div>
-        <div className="bg-pink-50 p-4 rounded-lg text-center">
+        <div
+          className="bg-pink-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.is_referral === true);
+            setModalCustomers(list);
+            setModalTitle(`Total Referrals (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.is_referral === true);
+              setModalCustomers(list);
+              setModalTitle(`Total Referrals (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <p className="text-sm text-black">Total Referrals</p>
           <p className="text-2xl font-bold text-pink-700">{referralCustomers}</p>
         </div>
