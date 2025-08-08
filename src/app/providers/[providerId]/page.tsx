@@ -13,8 +13,8 @@ interface ServiceRequest {
   created_at: string;
 }
 
-export default function ProviderDashboard({ params }: { params: { providerId: string } }) {
-  const providerId = params.providerId;
+export default function ProviderDashboard(props: any) {
+  const providerId = props?.params?.providerId as string;
   const [assigned, setAssigned] = useState<ServiceRequest[]>([]);
   const [claimable, setClaimable] = useState<ServiceRequest[]>([]);
   const [catalog, setCatalog] = useState<{id:string; code:string; name:string; price:number; currency:string}[]>([]);

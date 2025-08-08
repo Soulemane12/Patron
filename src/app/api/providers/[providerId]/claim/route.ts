@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { providerId: string } }
-) {
+export async function POST(request: Request, context: any) {
   try {
-    const providerId = params.providerId;
+    const providerId = context?.params?.providerId as string;
     const { requestId } = await request.json();
     if (!requestId) {
       return NextResponse.json({ error: 'requestId is required' }, { status: 400 });

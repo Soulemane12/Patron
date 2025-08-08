@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { providerId: string } }
-) {
+export async function GET(request: Request, context: any) {
   try {
-    const providerId = params.providerId;
+    const providerId = context?.params?.providerId as string;
     const url = new URL(request.url);
     const includePending = url.searchParams.get('includePending') === 'true';
 
