@@ -25,6 +25,9 @@ export default function StatsPage({ customers }: StatsPageProps) {
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
   const [mostPopularDay, setMostPopularDay] = useState<string>('');
   const [topAreas, setTopAreas] = useState<{area: string, count: number}[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalTitle, setModalTitle] = useState<string>('');
+  const [modalCustomers, setModalCustomers] = useState<Customer[]>([]);
 
   useEffect(() => {
     if (!customers || customers.length === 0) return;
@@ -268,12 +271,31 @@ export default function StatsPage({ customers }: StatsPageProps) {
         )}
       </div>
       
-      {/* Status Breakdown */}
+      {/* Status Breakdown */
+      }
       <div className="mt-6 bg-gray-50 p-4 rounded-lg">
         <h3 className="text-md font-semibold mb-3 text-black">Customer Status Breakdown</h3>
         
         {/* In Progress Customers */}
-        <div className="mb-3">
+        <div
+          className="mb-3 cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.status === 'active' || c.status === undefined);
+            setModalCustomers(list);
+            setModalTitle(`In Progress Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.status === 'active' || c.status === undefined);
+              setModalCustomers(list);
+              setModalTitle(`In Progress Customers (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <div className="flex justify-between mb-1">
             <span className="text-sm font-medium text-black">In Progress Customers</span>
             <span className="text-sm font-medium text-black">{activeCustomers} ({totalCustomers > 0 ? Math.round((activeCustomers / totalCustomers) * 100) : 0}%)</span>
@@ -287,7 +309,25 @@ export default function StatsPage({ customers }: StatsPageProps) {
         </div>
         
         {/* Completed Customers */}
-        <div className="mb-3">
+        <div
+          className="mb-3 cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.status === 'completed');
+            setModalCustomers(list);
+            setModalTitle(`Completed Installations (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.status === 'completed');
+              setModalCustomers(list);
+              setModalTitle(`Completed Installations (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <div className="flex justify-between mb-1">
             <span className="text-sm font-medium text-black">Completed Installations</span>
             <span className="text-sm font-medium text-black">{completedCustomers} ({totalCustomers > 0 ? Math.round((completedCustomers / totalCustomers) * 100) : 0}%)</span>
@@ -301,7 +341,25 @@ export default function StatsPage({ customers }: StatsPageProps) {
         </div>
         
         {/* Cancelled Customers */}
-        <div>
+        <div
+          className="cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.status === 'cancelled');
+            setModalCustomers(list);
+            setModalTitle(`Cancelled Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.status === 'cancelled');
+              setModalCustomers(list);
+              setModalTitle(`Cancelled Customers (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <div className="flex justify-between mb-1">
             <span className="text-sm font-medium text-black">Cancelled Customers</span>
             <span className="text-sm font-medium text-black">{cancelledCustomers} ({totalCustomers > 0 ? Math.round((cancelledCustomers / totalCustomers) * 100) : 0}%)</span>
@@ -314,6 +372,49 @@ export default function StatsPage({ customers }: StatsPageProps) {
           </div>
         </div>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsModalOpen(false)}></div>
+          <div className="relative bg-white w-full max-w-2xl mx-4 rounded-lg shadow-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-md font-semibold text-black">{modalTitle}</h4>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-sm px-3 py-1 rounded-md bg-gray-100 hover:bg-gray-200 text-black"
+              >
+                Close
+              </button>
+            </div>
+            {modalCustomers.length > 0 ? (
+              <div className="max-h-96 overflow-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-xs text-gray-600">
+                      <th className="py-2">Name</th>
+                      <th className="py-2">Install Date</th>
+                      <th className="py-2">Install Time</th>
+                      <th className="py-2">Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalCustomers.map((c) => (
+                      <tr key={c.id} className="border-t border-gray-200 text-sm text-black">
+                        <td className="py-2 pr-2 whitespace-nowrap">{c.name}</td>
+                        <td className="py-2 pr-2 whitespace-nowrap">{c.installation_date}</td>
+                        <td className="py-2 pr-2 whitespace-nowrap">{c.installation_time}</td>
+                        <td className="py-2 pr-2">{c.service_address}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-black">No customers found in this category.</p>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Customer Growth */}
       <div className="mt-6 bg-gray-50 p-4 rounded-lg">
