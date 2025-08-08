@@ -27,17 +27,25 @@ export default function ProviderDashboard(props: any) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/providers/${providerId}/requests?includePending=true`, { cache: 'no-store' });
+      // Guard missing providerId
+      if (!providerId) throw new Error('Missing providerId in URL');
+
+      // Add a timeout guard so the UI never hangs forever
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+
+      const res = await fetch(`/api/providers/${providerId}/requests?includePending=true`, { cache: 'no-store', signal: controller.signal });
       if (!res.ok) throw new Error('Failed to load requests');
       const data = await res.json();
       setAssigned(data.assigned || []);
       setClaimable(data.claimable || []);
-      const catRes = await fetch('/api/catalog', { cache: 'no-store' });
+      const catRes = await fetch('/api/catalog', { cache: 'no-store', signal: controller.signal });
       if (catRes.ok) {
         const cat = await catRes.json();
         setCatalog(cat.items || []);
         if (!selectedCatalogId && cat.items?.length) setSelectedCatalogId(cat.items[0].id);
       }
+      clearTimeout(timer);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
@@ -75,7 +83,9 @@ export default function ProviderDashboard(props: any) {
       <h1 className="text-xl font-semibold text-blue-800 mb-4">Provider Dashboard</h1>
       <p className="text-sm text-gray-700 mb-2">Provider ID: <span className="font-mono">{providerId}</span></p>
 
-      {loading ? (
+      {!providerId ? (
+        <p className="text-red-600">No providerId in URL. Visit /providers/PROVIDER_UUID</p>
+      ) : loading ? (
         <p className="text-black">Loading...</p>
       ) : error ? (
         <p className="text-red-600">{error}</p>
