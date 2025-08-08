@@ -199,10 +199,12 @@ export default function StatsPage({ customers }: StatsPageProps) {
               
               return (
                 <div key={index} className="flex flex-col items-center flex-1">
-                  <div 
-                    className="w-full bg-blue-500 rounded-t"
-                    style={{ height: `${height}%` }}
-                  ></div>
+                  <div className="w-full h-32 flex items-end">
+                    <div
+                      className="w-full bg-blue-500 rounded-t"
+                      style={{ height: `${height}%`, minHeight: height > 0 ? '4px' : 0 }}
+                    ></div>
+                  </div>
                   <p className="text-xs mt-1 text-black">{stat.month}</p>
                   <p className="text-xs font-semibold text-black">{stat.count}</p>
                 </div>
