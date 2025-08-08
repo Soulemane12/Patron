@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,6 +15,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Sales Pro Tracker",
   description: "Track your door-to-door sales, manage customer information, and get automated follow-up reminders",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
