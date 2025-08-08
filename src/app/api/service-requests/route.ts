@@ -44,7 +44,7 @@ async function pickEligibleProviderForService(
       .from('service_requests')
       .select('provider_id')
       .in('provider_id', availableProviderIds)
-      .in('status', ['claimed', 'accepted'])
+      .in('status', ['accepted'])
       .eq('scheduled_date', scheduledDate);
 
     if (!busyError && busy) {
