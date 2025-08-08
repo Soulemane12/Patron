@@ -8,21 +8,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'providerId and catalogId are required' }, { status: 400 });
     }
 
-    // Ensure provider exists
-    const { data: prov, error: provErr } = await supabaseAdmin
-      .from('providers')
-      .select('id')
+    // Verify this is actually a provider user
+    const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(providerId);
+    if (userError || !user.user) {
+      return NextResponse.json({ error: 'Provider not found' }, { status: 404 });
+    }
+
+    // Check if user has provider profile
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('users')
+      .select('user_type')
       .eq('id', providerId)
       .maybeSingle();
-    if (provErr || !prov) return NextResponse.json({ error: 'Provider not found' }, { status: 404 });
+
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
+    }
+
+    if (!profile || profile.user_type !== 'provider') {
+      return NextResponse.json({ error: 'User is not a provider' }, { status: 403 });
+    }
 
     // Ensure catalog item exists
-    const { data: cat, error: catErr } = await supabaseAdmin
+    const { data: cat, error: catError } = await supabaseAdmin
       .from('service_catalog')
       .select('id')
       .eq('id', catalogId)
       .maybeSingle();
-    if (catErr || !cat) return NextResponse.json({ error: 'Catalog item not found' }, { status: 404 });
+    if (catError || !cat) return NextResponse.json({ error: 'Catalog item not found' }, { status: 404 });
 
     // Insert mapping (idempotent)
     const { error: mapErr } = await supabaseAdmin

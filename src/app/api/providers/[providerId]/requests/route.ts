@@ -14,6 +14,29 @@ export async function GET(request: Request, context: any) {
 
     console.log(`Loading requests for provider: ${providerId}, includePending: ${includePending}`);
 
+    // First verify this is actually a provider
+    const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(providerId);
+    if (userError || !user.user) {
+      console.error('Error loading user:', userError);
+      return NextResponse.json({ error: 'Provider not found' }, { status: 404 });
+    }
+
+    // Check if user has provider profile
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('users')
+      .select('user_type')
+      .eq('id', providerId)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error loading user profile:', profileError);
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
+    }
+
+    if (!profile || profile.user_type !== 'provider') {
+      return NextResponse.json({ error: 'User is not a provider' }, { status: 403 });
+    }
+
     // Requests assigned to this provider
     const { data: assigned, error: assignedError } = await supabaseAdmin
       .from('service_requests')

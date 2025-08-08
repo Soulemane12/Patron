@@ -9,6 +9,27 @@ export async function POST(request: Request, context: any) {
       return NextResponse.json({ error: 'requestId is required' }, { status: 400 });
     }
 
+    // Verify this is actually a provider user
+    const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(providerId);
+    if (userError || !user.user) {
+      return NextResponse.json({ error: 'Provider not found' }, { status: 404 });
+    }
+
+    // Check if user has provider profile
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('users')
+      .select('user_type')
+      .eq('id', providerId)
+      .maybeSingle();
+
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
+    }
+
+    if (!profile || profile.user_type !== 'provider') {
+      return NextResponse.json({ error: 'User is not a provider' }, { status: 403 });
+    }
+
     // Attempt to claim the request using DB function if present; otherwise set accepted directly
     let claimedOk = false;
 

@@ -1,4 +1,4 @@
--- Service catalog and provider mapping
+-- Service catalog and provider mapping (using users table)
 
 create extension if not exists pgcrypto;
 
@@ -29,25 +29,9 @@ create trigger trg_service_catalog_updated_at
   before update on public.service_catalog
   for each row execute function public.update_updated_at_column();
 
--- Providers table (if missing)
-create table if not exists public.providers (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  email text,
-  phone text,
-  is_active boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-drop trigger if exists trg_providers_updated_at on public.providers;
-create trigger trg_providers_updated_at
-  before update on public.providers
-  for each row execute function public.update_updated_at_column();
-
--- Mapping: which catalog items a provider offers
+-- Mapping: which catalog items a provider (user with user_type='provider') offers
 create table if not exists public.provider_services (
-  provider_id uuid not null references public.providers(id) on delete cascade,
+  provider_id uuid not null references auth.users(id) on delete cascade,
   catalog_id uuid not null references public.service_catalog(id) on delete cascade,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -63,7 +47,7 @@ create trigger trg_provider_services_updated_at
 create index if not exists idx_provider_services_provider on public.provider_services(provider_id);
 create index if not exists idx_provider_services_catalog on public.provider_services(catalog_id);
 
--- Seed a few catalog items (idempotent on code)
+-- Seed catalog (idempotent)
 insert into public.service_catalog (code, name, description, price)
 values
   ('BASIC_INSTALL', 'Basic Install', 'Standard installation package', 0),
