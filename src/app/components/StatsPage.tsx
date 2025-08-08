@@ -165,7 +165,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
       <h2 className="text-lg md:text-xl font-semibold mb-4 text-blue-800">Sales Analytics</h2>
       
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         <div
           className="bg-blue-50 p-4 rounded-lg text-center cursor-pointer"
           role="button"
@@ -289,6 +289,28 @@ export default function StatsPage({ customers }: StatsPageProps) {
         >
           <p className="text-sm text-black">Total Referrals</p>
           <p className="text-2xl font-bold text-pink-700">{referralCustomers}</p>
+        </div>
+        <div
+          className="bg-red-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.status === 'cancelled');
+            setModalCustomers(list);
+            setModalTitle(`Cancelled Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.status === 'cancelled');
+              setModalCustomers(list);
+              setModalTitle(`Cancelled Customers (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
+          <p className="text-sm text-black">Cancelled</p>
+          <p className="text-2xl font-bold text-red-700">{cancelledCustomers}</p>
         </div>
       </div>
       
