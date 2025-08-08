@@ -15,6 +15,7 @@ interface ServiceRequest {
 
 export default function ProviderDashboard(props: any) {
   const providerId = props?.params?.providerId as string;
+  const [debug, setDebug] = useState<string>('');
   const [assigned, setAssigned] = useState<ServiceRequest[]>([]);
   const [claimable, setClaimable] = useState<ServiceRequest[]>([]);
   const [catalog, setCatalog] = useState<{id:string; code:string; name:string; price:number; currency:string}[]>([]);
@@ -26,28 +27,36 @@ export default function ProviderDashboard(props: any) {
   const load = async () => {
     setLoading(true);
     setError(null);
+    setDebug(`Loading for provider: ${providerId}`);
     try {
-      // Guard missing providerId
-      if (!providerId) throw new Error('Missing providerId in URL');
+      if (!providerId) {
+        setError('No provider ID provided');
+        return;
+      }
 
-      // Add a timeout guard so the UI never hangs forever
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
-
-      const res = await fetch(`/api/providers/${providerId}/requests?includePending=true`, { cache: 'no-store', signal: controller.signal });
-      if (!res.ok) throw new Error('Failed to load requests');
+      const res = await fetch(`/api/providers/${providerId}/requests?includePending=true`, { cache: 'no-store' });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to load requests: ${res.status} ${errorText}`);
+      }
       const data = await res.json();
+      setDebug(`Loaded ${data.assigned?.length || 0} assigned, ${data.claimable?.length || 0} claimable`);
       setAssigned(data.assigned || []);
       setClaimable(data.claimable || []);
-      const catRes = await fetch('/api/catalog', { cache: 'no-store', signal: controller.signal });
+
+      const catRes = await fetch('/api/catalog', { cache: 'no-store' });
       if (catRes.ok) {
         const cat = await catRes.json();
+        setDebug(prev => `${prev}, ${cat.items?.length || 0} catalog items`);
         setCatalog(cat.items || []);
         if (!selectedCatalogId && cat.items?.length) setSelectedCatalogId(cat.items[0].id);
+      } else {
+        setDebug(prev => `${prev}, catalog failed: ${catRes.status}`);
       }
-      clearTimeout(timer);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unknown error');
+      const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+      setError(errorMsg);
+      setDebug(`Error: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -82,13 +91,18 @@ export default function ProviderDashboard(props: any) {
     <div className="min-h-screen bg-gray-50 p-4 max-w-3xl mx-auto">
       <h1 className="text-xl font-semibold text-blue-800 mb-4">Provider Dashboard</h1>
       <p className="text-sm text-gray-700 mb-2">Provider ID: <span className="font-mono">{providerId}</span></p>
+      {debug && <p className="text-xs text-gray-500 mb-2">Debug: {debug}</p>}
 
-      {!providerId ? (
-        <p className="text-red-600">No providerId in URL. Visit /providers/PROVIDER_UUID</p>
-      ) : loading ? (
-        <p className="text-black">Loading...</p>
+      {loading ? (
+        <div className="text-black">
+          <p>Loading...</p>
+          <p className="text-sm text-gray-600">Provider ID: {providerId || 'undefined'}</p>
+        </div>
       ) : error ? (
-        <p className="text-red-600">{error}</p>
+        <div className="text-red-600">
+          <p>{error}</p>
+          <button onClick={load} className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm">Retry</button>
+        </div>
       ) : (
         <div className="space-y-6">
           <section className="bg-white rounded-lg shadow p-4">
