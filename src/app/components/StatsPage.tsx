@@ -272,10 +272,10 @@ export default function StatsPage({ customers }: StatsPageProps) {
       <div className="mt-6 bg-gray-50 p-4 rounded-lg">
         <h3 className="text-md font-semibold mb-3 text-black">Customer Status Breakdown</h3>
         
-        {/* Active Customers */}
+        {/* In Progress Customers */}
         <div className="mb-3">
           <div className="flex justify-between mb-1">
-            <span className="text-sm font-medium text-black">Active Customers</span>
+            <span className="text-sm font-medium text-black">In Progress Customers</span>
             <span className="text-sm font-medium text-black">{activeCustomers} ({totalCustomers > 0 ? Math.round((activeCustomers / totalCustomers) * 100) : 0}%)</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">

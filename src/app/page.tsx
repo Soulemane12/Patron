@@ -436,7 +436,7 @@ export default function Home() {
                   className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Customers</option>
-                  <option value="active">Active Customers</option>
+              <option value="active">In Progress Customers</option>
                   <option value="cancelled">Cancelled Customers</option>
                   <option value="completed">Completed Installations</option>
                   <option value="referrals">Referrals</option>
@@ -508,7 +508,7 @@ export default function Home() {
                                 })}
                                 className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                               >
-                                <option value="active">Active</option>
+                <option value="active">In Progress</option>
                                 <option value="cancelled">Cancelled</option>
                                 <option value="completed">Completed</option>
                               </select>
