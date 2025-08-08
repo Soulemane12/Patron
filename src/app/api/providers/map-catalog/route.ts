@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user has provider profile
     const { data: profile, error: profileError } = await supabaseAdmin
-      .from('provider_profiles')
+      .from('user_profiles')
       .select('user_type')
       .eq('id', providerId)
       .maybeSingle();

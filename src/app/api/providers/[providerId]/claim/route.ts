@@ -17,7 +17,7 @@ export async function POST(request: Request, context: any) {
 
     // Check if user has provider profile
     const { data: profile, error: profileError } = await supabaseAdmin
-      .from('provider_profiles')
+      .from('user_profiles')
       .select('user_type')
       .eq('id', providerId)
       .maybeSingle();
@@ -30,38 +30,21 @@ export async function POST(request: Request, context: any) {
       return NextResponse.json({ error: 'User is not a provider' }, { status: 403 });
     }
 
-    // Attempt to claim the request using DB function if present; otherwise set accepted directly
-    let claimedOk = false;
+    // Claim the request by updating it
+    const { error: updateError } = await supabaseAdmin
+      .from('service_requests')
+      .update({
+        status: 'accepted',
+        provider_id: providerId,
+        claimed_by: providerId,
+        claimed_at: new Date().toISOString(),
+      })
+      .eq('id', requestId)
+      .is('provider_id', null)
+      .eq('status', 'pending');
 
-    const { data: claimOk, error: claimError } = await supabaseAdmin.rpc('claim_service_request', {
-      request_id: requestId,
-      claiming_provider_id: providerId,
-    });
-
-    if (!claimError && claimOk === true) {
-      claimedOk = true;
-    } else {
-      // Fallback: accept directly if enum does not have 'claimed'
-      const { error: updateError } = await supabaseAdmin
-        .from('service_requests')
-        .update({
-          status: 'accepted',
-          provider_id: providerId,
-          claimed_by: providerId,
-          claimed_at: new Date().toISOString(),
-          expires_at: null,
-        })
-        .eq('id', requestId)
-        .is('provider_id', null)
-        .eq('status', 'pending');
-
-      if (!updateError) {
-        claimedOk = true;
-      }
-    }
-
-    if (!claimedOk) {
-      return NextResponse.json({ error: 'Unable to claim request' }, { status: 409 });
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
     const { data: updated, error: fetchError } = await supabaseAdmin
