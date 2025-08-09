@@ -166,6 +166,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
       
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+        {/* Total Customers */}
         <div
           className="bg-blue-50 p-4 rounded-lg text-center cursor-pointer"
           role="button"
@@ -186,6 +187,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
           <p className="text-sm text-black">Total Customers</p>
           <p className="text-2xl font-bold text-blue-700">{totalCustomers}</p>
         </div>
+        {/* Upcoming Installations */}
         <div
           className="bg-green-50 p-4 rounded-lg text-center cursor-pointer"
           role="button"
@@ -210,6 +212,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
           <p className="text-sm text-black">Upcoming Installations</p>
           <p className="text-2xl font-bold text-green-700">{upcomingInstallations}</p>
         </div>
+        {/* Completed Installations (by date in past) */}
         <div
           className="bg-yellow-50 p-4 rounded-lg text-center cursor-pointer"
           role="button"
@@ -234,6 +237,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
           <p className="text-sm text-black">Completed Installations</p>
           <p className="text-2xl font-bold text-yellow-700">{pastInstallations}</p>
         </div>
+        {/* This Month */}
         <div
           className="bg-purple-50 p-4 rounded-lg text-center cursor-pointer"
           role="button"
@@ -268,6 +272,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
           <p className="text-sm text-black">This Month</p>
           <p className="text-2xl font-bold text-purple-700">{thisMonthInstallations}</p>
         </div>
+        {/* Total Referrals */}
         <div
           className="bg-pink-50 p-4 rounded-lg text-center cursor-pointer"
           role="button"
@@ -290,6 +295,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
           <p className="text-sm text-black">Total Referrals</p>
           <p className="text-2xl font-bold text-pink-700">{referralCustomers}</p>
         </div>
+        {/* Cancelled */}
         <div
           className="bg-red-50 p-4 rounded-lg text-center cursor-pointer"
           role="button"
