@@ -526,6 +526,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
                   <thead>
                     <tr className="text-xs text-gray-600">
                       <th className="py-2">Name</th>
+                      <th className="py-2">Phone</th>
                       <th className="py-2">Install Date</th>
                       <th className="py-2">Install Time</th>
                       <th className="py-2">Address</th>
@@ -535,6 +536,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
                     {modalCustomers.map((c) => (
                       <tr key={c.id} className="border-t border-gray-200 text-sm text-black">
                         <td className="py-2 pr-2 whitespace-nowrap">{c.name}</td>
+                        <td className="py-2 pr-2 whitespace-nowrap">{c.phone}</td>
                         <td className="py-2 pr-2 whitespace-nowrap">{c.installation_date}</td>
                         <td className="py-2 pr-2 whitespace-nowrap">{c.installation_time}</td>
                         <td className="py-2 pr-2">{c.service_address}</td>
