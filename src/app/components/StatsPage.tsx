@@ -536,7 +536,18 @@ export default function StatsPage({ customers }: StatsPageProps) {
                     {modalCustomers.map((c) => (
                       <tr key={c.id} className="border-t border-gray-200 text-sm text-black">
                         <td className="py-2 pr-2 whitespace-nowrap">{c.name}</td>
-                        <td className="py-2 pr-2 whitespace-nowrap">{c.phone}</td>
+                        <td className="py-2 pr-2 whitespace-nowrap">
+                          {c.phone ? (
+                            <a
+                              href={`tel:${c.phone.replace(/[^\d+]/g, '')}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              {c.phone}
+                            </a>
+                          ) : (
+                            <span>-</span>
+                          )}
+                        </td>
                         <td className="py-2 pr-2 whitespace-nowrap">{c.installation_date}</td>
                         <td className="py-2 pr-2 whitespace-nowrap">{c.installation_time}</td>
                         <td className="py-2 pr-2">{c.service_address}</td>
