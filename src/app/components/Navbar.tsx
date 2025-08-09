@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 interface NavbarProps {
   activeSection: string;
@@ -8,10 +10,26 @@ interface NavbarProps {
 }
 
 export default function Navbar({ activeSection, onSectionChange }: NavbarProps) {
+  const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState<boolean>(false);
+
+  async function handleSignOut() {
+    try {
+      setIsSigningOut(true);
+      await supabase.auth.signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('Sign out failed', error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
   return (
     <nav className="bg-white shadow-md rounded-lg mb-6 overflow-hidden">
-      <div className="flex flex-wrap">
-        <NavItem 
+      <div className="flex items-center justify-between flex-wrap gap-2 p-2">
+        <div className="flex flex-wrap flex-1">
+          <NavItem 
           id="calendar"
           label="Calendar" 
           icon={
@@ -56,6 +74,18 @@ export default function Navbar({ activeSection, onSectionChange }: NavbarProps) 
           isActive={activeSection === 'stats'}
           onClick={() => onSectionChange('stats')}
         />
+        </div>
+        <button
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="ml-auto inline-flex items-center gap-2 px-3 py-2 text-xs md:text-sm font-medium text-gray-700 hover:text-red-600 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 disabled:opacity-50"
+          aria-label="Sign out"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 4.75A1.75 1.75 0 014.75 3h5.5A1.75 1.75 0 0112 4.75v1a.75.75 0 01-1.5 0v-1a.25.25 0 00-.25-.25h-5.5a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25h5.5a.25.25 0 00.25-.25v-1a.75.75 0 011.5 0v1A1.75 1.75 0 0110.25 17h-5.5A1.75 1.75 0 013 15.25V4.75zm12.53 5.47a.75.75 0 000-1.06l-2.5-2.5a.75.75 0 10-1.06 1.06l1.22 1.22H8.75a.75.75 0 000 1.5h4.44l-1.22 1.22a.75.75 0 101.06 1.06l2.5-2.5z" clipRule="evenodd" />
+          </svg>
+          {isSigningOut ? 'Signing out...' : 'Sign Out'}
+        </button>
       </div>
     </nav>
   );
