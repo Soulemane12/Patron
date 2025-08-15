@@ -18,6 +18,7 @@ interface CustomerInfo {
   installationTime: string;
   isReferral: boolean;
   referralSource: string;
+  leadSize?: '500MB' | '1GIG' | '2GIG';
 }
 
 export default function Home() {
@@ -128,6 +129,7 @@ export default function Home() {
             status: 'active', // Default status for new customers
             is_referral: formattedInfo.isReferral || false,
             referral_source: formattedInfo.isReferral ? formattedInfo.referralSource : null,
+            lead_size: formattedInfo.leadSize || '2GIG', // Default to 2GIG as requested
           },
         ])
         .select();
@@ -241,6 +243,7 @@ export default function Home() {
           status: status,
           is_referral: editingCustomer.is_referral || false,
           referral_source: editingCustomer.is_referral ? (editingCustomer.referral_source || '') : null,
+          lead_size: editingCustomer.lead_size || '2GIG',
         })
         .eq('id', editingCustomer.id);
 
@@ -592,6 +595,18 @@ export default function Home() {
                               />
                             </div>
                             <div>
+                              <label className="block text-xs md:text-sm font-medium text-black mb-1">Lead Size</label>
+                              <select
+                                value={editingCustomer.lead_size || '2GIG'}
+                                onChange={(e) => setEditingCustomer({ ...editingCustomer, lead_size: e.target.value as '500MB' | '1GIG' | '2GIG' })}
+                                className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                              >
+                                <option value="500MB">500MB</option>
+                                <option value="1GIG">1GIG</option>
+                                <option value="2GIG">2GIG</option>
+                              </select>
+                            </div>
+                            <div>
                               <label className="block text-xs md:text-sm font-medium text-black mb-1">Is Referral?</label>
                               <div className="flex items-center gap-4 mt-1">
                                 <label className="inline-flex items-center">
@@ -702,6 +717,22 @@ export default function Home() {
                               title="Click to view full details"
                             >
                               <span className="font-medium">Installation:</span> {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
+                            </p>
+                            <p 
+                              className="text-sm md:text-base text-black cursor-pointer hover:text-blue-600 transition-colors"
+                              onClick={() => openCustomerModal(customer)}
+                              title="Click to view full details"
+                            >
+                              <span className="font-medium">Lead Size:</span> 
+                              <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${
+                                customer.lead_size === '500MB' 
+                                  ? 'bg-orange-100 text-orange-800' 
+                                  : customer.lead_size === '1GIG'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {customer.lead_size || '2GIG'}
+                              </span>
                             </p>
                             {customer.is_referral && customer.referral_source && (
                               <p 
@@ -896,6 +927,18 @@ export default function Home() {
                   onChange={(e) => setFormattedInfo({ ...formattedInfo, installationTime: e.target.value })}
                   className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                 />
+              </div>
+              <div>
+                <label className="block text-xs md:text-sm font-medium text-black mb-1">Lead Size</label>
+                <select
+                  value={formattedInfo.leadSize || '2GIG'}
+                  onChange={(e) => setFormattedInfo({ ...formattedInfo, leadSize: e.target.value as '500MB' | '1GIG' | '2GIG' })}
+                  className="w-full p-2 md:p-3 text-sm md:text-base border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                >
+                  <option value="500MB">500MB</option>
+                  <option value="1GIG">1GIG</option>
+                  <option value="2GIG">2GIG</option>
+                </select>
               </div>
               {formattedInfo.isReferral && (
                 <div>

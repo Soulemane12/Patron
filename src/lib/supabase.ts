@@ -18,6 +18,7 @@ export interface Customer {
   status?: 'active' | 'cancelled' | 'completed';
   is_referral?: boolean;
   referral_source?: string;
+  lead_size?: '500MB' | '1GIG' | '2GIG';
 }
 
 export interface EmailNotification {
