@@ -330,15 +330,46 @@ export default function StatsPage({ customers }: StatsPageProps) {
               const height = maxCount > 0 ? (stat.count / maxCount) * 100 : 0;
               
               return (
-                <div key={index} className="flex flex-col items-center flex-1">
+                <div 
+                  key={index} 
+                  className="flex flex-col items-center flex-1 cursor-pointer hover:bg-blue-50 p-2 rounded transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const [month, year] = stat.month.split(' ');
+                    const monthIndex = new Date(`${month} 1, ${year}`).getMonth();
+                    const yearNum = parseInt(year);
+                    const list = customers.filter(c => {
+                      const installDate = new Date(c.installation_date);
+                      return installDate.getMonth() === monthIndex && installDate.getFullYear() === yearNum;
+                    });
+                    setModalCustomers(list);
+                    setModalTitle(`${stat.month} Installations (${list.length})`);
+                    setIsModalOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      const [month, year] = stat.month.split(' ');
+                      const monthIndex = new Date(`${month} 1, ${year}`).getMonth();
+                      const yearNum = parseInt(year);
+                      const list = customers.filter(c => {
+                        const installDate = new Date(c.installation_date);
+                        return installDate.getMonth() === monthIndex && installDate.getFullYear() === yearNum;
+                      });
+                      setModalCustomers(list);
+                      setModalTitle(`${stat.month} Installations (${list.length})`);
+                      setIsModalOpen(true);
+                    }
+                  }}
+                >
                   <div className="w-full h-32 flex items-end">
                     <div
-                      className="w-full bg-blue-500 rounded-t"
+                      className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
                       style={{ height: `${height}%`, minHeight: height > 0 ? '4px' : 0 }}
                     ></div>
                   </div>
-                  <p className="text-xs mt-1 text-black">{stat.month}</p>
-                  <p className="text-xs font-semibold text-black">{stat.count}</p>
+                  <p className="text-xs mt-1 text-black font-medium">{stat.month}</p>
+                  <p className="text-xs font-semibold text-blue-700">{stat.count}</p>
                 </div>
               );
             })}
@@ -348,9 +379,48 @@ export default function StatsPage({ customers }: StatsPageProps) {
       
       {/* Additional Insights */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-gray-50 p-4 rounded-lg">
+        <div 
+          className="bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            if (mostPopularDay) {
+              const dayMatch = mostPopularDay.match(/^(\w+)/);
+              if (dayMatch) {
+                const dayName = dayMatch[1];
+                const list = customers.filter(c => {
+                  const installDate = new Date(c.installation_date);
+                  const day = installDate.toLocaleString('default', { weekday: 'long' });
+                  return day === dayName;
+                });
+                setModalCustomers(list);
+                setModalTitle(`${dayName} Installations (${list.length})`);
+                setIsModalOpen(true);
+              }
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (mostPopularDay) {
+                const dayMatch = mostPopularDay.match(/^(\w+)/);
+                if (dayMatch) {
+                  const dayName = dayMatch[1];
+                  const list = customers.filter(c => {
+                    const installDate = new Date(c.installation_date);
+                    const day = installDate.toLocaleString('default', { weekday: 'long' });
+                    return day === dayName;
+                  });
+                  setModalCustomers(list);
+                  setModalTitle(`${dayName} Installations (${list.length})`);
+                  setIsModalOpen(true);
+                }
+              }
+            }
+          }}
+        >
           <h3 className="text-md font-semibold mb-2 text-black">Most Popular Day</h3>
-          <p className="text-black">{mostPopularDay || 'Not enough data'}</p>
+          <p className="text-black font-medium">{mostPopularDay || 'Not enough data'}</p>
+          <p className="text-xs text-gray-600 mt-1">Click to view all installations on this day</p>
         </div>
         
         <div className="bg-gray-50 p-4 rounded-lg">
@@ -358,15 +428,55 @@ export default function StatsPage({ customers }: StatsPageProps) {
           {topAreas.length > 0 ? (
             <ul className="text-black">
               {topAreas.map((area, index) => (
-                <li key={index} className="flex justify-between mb-1">
-                  <span>{area.area}</span>
-                  <span className="font-semibold">{area.count} customers</span>
+                <li 
+                  key={index} 
+                  className="flex justify-between mb-1 cursor-pointer hover:bg-gray-100 p-1 rounded transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const list = customers.filter(c => {
+                      const addressParts = c.service_address.split(',');
+                      let customerArea = 'Unknown';
+                      if (addressParts.length > 1) {
+                        const cityState = addressParts[addressParts.length - 2]?.trim();
+                        if (cityState) {
+                          customerArea = cityState;
+                        }
+                      }
+                      return customerArea === area.area;
+                    });
+                    setModalCustomers(list);
+                    setModalTitle(`${area.area} Customers (${list.length})`);
+                    setIsModalOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      const list = customers.filter(c => {
+                        const addressParts = c.service_address.split(',');
+                        let customerArea = 'Unknown';
+                        if (addressParts.length > 1) {
+                          const cityState = addressParts[addressParts.length - 2]?.trim();
+                          if (cityState) {
+                            customerArea = cityState;
+                          }
+                        }
+                        return customerArea === area.area;
+                      });
+                      setModalCustomers(list);
+                      setModalTitle(`${area.area} Customers (${list.length})`);
+                      setIsModalOpen(true);
+                    }
+                  }}
+                >
+                  <span className="font-medium">{area.area}</span>
+                  <span className="font-semibold text-blue-700">{area.count} customers</span>
                 </li>
               ))}
             </ul>
           ) : (
             <p className="text-black">Not enough data</p>
           )}
+          <p className="text-xs text-gray-600 mt-2">Click on any area to view customers</p>
         </div>
       </div>
       
@@ -374,7 +484,25 @@ export default function StatsPage({ customers }: StatsPageProps) {
       <div className="mt-6 bg-purple-50 p-4 rounded-lg">
         <h3 className="text-md font-semibold mb-3 text-purple-800">Referral Statistics</h3>
         
-        <div className="flex items-center mb-3">
+        <div 
+          className="flex items-center mb-3 cursor-pointer hover:bg-purple-100 p-2 rounded transition-colors"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.is_referral === true);
+            setModalCustomers(list);
+            setModalTitle(`All Referral Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.is_referral === true);
+              setModalCustomers(list);
+              setModalTitle(`All Referral Customers (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
           <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mr-4">
             <span className="text-2xl font-bold text-purple-700">{referralCustomers}</span>
           </div>
@@ -383,6 +511,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
             <p className="text-sm text-black">
               {totalCustomers > 0 ? Math.round((referralCustomers / totalCustomers) * 100) : 0}% of all customers
             </p>
+            <p className="text-xs text-purple-600 mt-1">Click to view all referral customers</p>
           </div>
         </div>
         
@@ -391,8 +520,27 @@ export default function StatsPage({ customers }: StatsPageProps) {
             <h4 className="text-sm font-medium text-black mb-2">Top Referral Sources:</h4>
             <ul className="space-y-1">
               {referralSources.map((source, index) => (
-                <li key={index} className="flex justify-between">
-                  <span className="text-sm text-black">{source.source}</span>
+                <li 
+                  key={index} 
+                  className="flex justify-between cursor-pointer hover:bg-purple-50 p-1 rounded transition-colors"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const list = customers.filter(c => c.is_referral === true && c.referral_source === source.source);
+                    setModalCustomers(list);
+                    setModalTitle(`${source.source} Referrals (${list.length})`);
+                    setIsModalOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      const list = customers.filter(c => c.is_referral === true && c.referral_source === source.source);
+                      setModalCustomers(list);
+                      setModalTitle(`${source.source} Referrals (${list.length})`);
+                      setIsModalOpen(true);
+                    }
+                  }}
+                >
+                  <span className="text-sm text-black font-medium">{source.source}</span>
                   <span className="text-sm font-medium text-purple-700">{source.count} referrals</span>
                 </li>
               ))}
@@ -508,56 +656,101 @@ export default function StatsPage({ customers }: StatsPageProps) {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setIsModalOpen(false)}></div>
-          <div className="relative bg-white w-full max-w-2xl mx-4 rounded-lg shadow-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-md font-semibold text-black">{modalTitle}</h4>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsModalOpen(false)}></div>
+          <div className="relative bg-white w-full max-w-4xl mx-4 rounded-lg shadow-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-black">{modalTitle}</h4>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-sm px-3 py-1 rounded-md bg-gray-100 hover:bg-gray-200 text-black"
+                className="text-sm px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-black transition-colors"
               >
-                Close
+                ✕ Close
               </button>
             </div>
             {modalCustomers.length > 0 ? (
               <div className="max-h-96 overflow-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-xs text-gray-600">
-                      <th className="py-2">Name</th>
-                      <th className="py-2">Phone</th>
-                      <th className="py-2">Install Date</th>
-                      <th className="py-2">Install Time</th>
-                      <th className="py-2">Address</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modalCustomers.map((c) => (
-                      <tr key={c.id} className="border-t border-gray-200 text-sm text-black">
-                        <td className="py-2 pr-2 whitespace-nowrap">{c.name}</td>
-                        <td className="py-2 pr-2 whitespace-nowrap">
-                          {c.phone ? (
-                            <a
-                              href={`tel:${c.phone.replace(/[^\d+]/g, '')}`}
-                              className="text-blue-600 hover:underline"
-                            >
-                              {c.phone}
-                            </a>
-                          ) : (
-                            <span>-</span>
+                <div className="grid gap-3">
+                  {modalCustomers.map((c) => (
+                    <div key={c.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h5 className="font-semibold text-black text-lg">{c.name}</h5>
+                            {c.status && (
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                c.status === 'active' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : c.status === 'cancelled'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                              </span>
+                            )}
+                            {c.is_referral && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800">
+                                Referral
+                              </span>
+                            )}
+                            {c.lead_size && (
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                c.lead_size === '500MB' 
+                                  ? 'bg-orange-100 text-orange-800' 
+                                  : c.lead_size === '1GIG'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {c.lead_size}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600">📧</span>
+                              <a href={`mailto:${c.email}`} className="text-blue-600 hover:text-blue-800">
+                                {c.email}
+                              </a>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600">📞</span>
+                              <a href={`tel:${c.phone}`} className="text-blue-600 hover:text-blue-800">
+                                {c.phone}
+                              </a>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600">📅</span>
+                              <span className="text-black">
+                                {new Date(c.installation_date).toLocaleDateString()} at {c.installation_time}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600">📍</span>
+                              <span className="text-black">{c.service_address}</span>
+                            </div>
+                          </div>
+                          {c.is_referral && c.referral_source && (
+                            <div className="mt-2 text-sm">
+                              <span className="text-purple-600 font-medium">Referred by:</span> {c.referral_source}
+                            </div>
                           )}
-                        </td>
-                        <td className="py-2 pr-2 whitespace-nowrap">{c.installation_date}</td>
-                        <td className="py-2 pr-2 whitespace-nowrap">{c.installation_time}</td>
-                        <td className="py-2 pr-2">{c.service_address}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <div className="mt-3 md:mt-0 md:ml-4">
+                          <div className="text-xs text-gray-500">
+                            <div>Created: {new Date(c.created_at).toLocaleDateString()}</div>
+                            <div>Updated: {new Date(c.updated_at).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
-              <p className="text-sm text-black">No customers found in this category.</p>
+              <div className="text-center py-8">
+                <p className="text-gray-500 text-lg">No customers found in this category.</p>
+                <p className="text-gray-400 text-sm mt-2">Try adjusting your filters or add more customers.</p>
+              </div>
             )}
           </div>
         </div>
