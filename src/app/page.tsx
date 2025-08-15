@@ -7,6 +7,7 @@ import InstallationCalendar from './components/InstallationCalendar';
 import DailyInstallations from './components/DailyInstallations';
 import Navbar from './components/Navbar';
 import StatsPage from './components/StatsPage';
+import CustomerDetailsModal from './components/CustomerDetailsModal';
 
 interface CustomerInfo {
   name: string;
@@ -41,6 +42,8 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterBy, setFilterBy] = useState<string>('all');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
 
   // Calculate email notification dates
@@ -143,6 +146,27 @@ export default function Home() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Modal handlers
+  const openCustomerModal = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsModalOpen(true);
+  };
+
+  const closeCustomerModal = () => {
+    setSelectedCustomer(null);
+    setIsModalOpen(false);
+  };
+
+  const handleModalEdit = (customer: Customer) => {
+    closeCustomerModal();
+    startEditingCustomer(customer);
+  };
+
+  const handleModalDelete = (customerId: string) => {
+    closeCustomerModal();
+    deleteCustomer(customerId);
   };
 
   const loadCustomers = async () => {
@@ -629,7 +653,13 @@ export default function Home() {
                         <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-3">
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-base md:text-lg text-black">{customer.name}</h3>
+                              <h3 
+                                className="font-semibold text-base md:text-lg text-black cursor-pointer hover:text-blue-600 transition-colors"
+                                onClick={() => openCustomerModal(customer)}
+                                title="Click to view full details"
+                              >
+                                {customer.name}
+                              </h3>
                               <div className="flex gap-1">
                                 {customer.status && (
                                   <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -649,14 +679,36 @@ export default function Home() {
                                 )}
                               </div>
                             </div>
-                            <p className="text-sm md:text-base text-black">{customer.email}</p>
-                            <p className="text-sm md:text-base text-black">{customer.phone}</p>
-                            <p className="text-sm md:text-base text-black">{customer.service_address}</p>
                             <p className="text-sm md:text-base text-black">
+                              <a href={`mailto:${customer.email}`} className="text-blue-600 hover:text-blue-800">
+                                {customer.email}
+                              </a>
+                            </p>
+                            <p className="text-sm md:text-base text-black">
+                              <a href={`tel:${customer.phone}`} className="text-blue-600 hover:text-blue-800">
+                                {customer.phone}
+                              </a>
+                            </p>
+                            <p 
+                              className="text-sm md:text-base text-black cursor-pointer hover:text-blue-600 transition-colors"
+                              onClick={() => openCustomerModal(customer)}
+                              title="Click to view full details"
+                            >
+                              {customer.service_address}
+                            </p>
+                            <p 
+                              className="text-sm md:text-base text-black cursor-pointer hover:text-blue-600 transition-colors"
+                              onClick={() => openCustomerModal(customer)}
+                              title="Click to view full details"
+                            >
                               <span className="font-medium">Installation:</span> {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
                             </p>
                             {customer.is_referral && customer.referral_source && (
-                              <p className="text-sm md:text-base text-purple-700 mt-1">
+                              <p 
+                                className="text-sm md:text-base text-purple-700 mt-1 cursor-pointer hover:text-purple-900 transition-colors"
+                                onClick={() => openCustomerModal(customer)}
+                                title="Click to view full details"
+                              >
                                 <span className="font-medium">Referred by:</span> {customer.referral_source}
                               </p>
                             )}
@@ -877,6 +929,14 @@ export default function Home() {
           </div>
         )}
 
+        {/* Customer Details Modal */}
+        <CustomerDetailsModal
+          customer={selectedCustomer}
+          isOpen={isModalOpen}
+          onClose={closeCustomerModal}
+          onEdit={handleModalEdit}
+          onDelete={handleModalDelete}
+        />
 
       </div>
     </div>
