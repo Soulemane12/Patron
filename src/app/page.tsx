@@ -43,6 +43,7 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterBy, setFilterBy] = useState<string>('all');
+  const [locationFilter, setLocationFilter] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -258,8 +259,25 @@ export default function Home() {
     }
   };
 
+  // Get unique locations from customers
+  const getUniqueLocations = () => {
+    const locations = new Set<string>();
+    customers.forEach(customer => {
+      const addressParts = customer.service_address.split(',');
+      let location = 'Unknown';
+      if (addressParts.length > 1) {
+        const cityState = addressParts[addressParts.length - 2]?.trim();
+        if (cityState) {
+          location = cityState;
+        }
+      }
+      locations.add(location);
+    });
+    return Array.from(locations).sort();
+  };
+
   // Filter and sort customers based on search term, filter, and sort options
-  const filterAndSortCustomers = (term: string, filter: string, sort: string, order: 'asc' | 'desc') => {
+  const filterAndSortCustomers = (term: string, filter: string, sort: string, order: 'asc' | 'desc', location: string = 'all') => {
     let filtered = [...customers];
     
     // Apply search filter
@@ -313,6 +331,21 @@ export default function Home() {
       );
     }
     
+    // Apply location filter
+    if (location !== 'all') {
+      filtered = filtered.filter(customer => {
+        const addressParts = customer.service_address.split(',');
+        let customerLocation = 'Unknown';
+        if (addressParts.length > 1) {
+          const cityState = addressParts[addressParts.length - 2]?.trim();
+          if (cityState) {
+            customerLocation = cityState;
+          }
+        }
+        return customerLocation === location;
+      });
+    }
+    
     // Apply sorting
     filtered.sort((a, b) => {
       let aValue: any, bValue: any;
@@ -359,28 +392,35 @@ export default function Home() {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
     setSearchTerm(term);
-    filterAndSortCustomers(term, filterBy, sortBy, sortOrder);
+    filterAndSortCustomers(term, filterBy, sortBy, sortOrder, locationFilter);
   };
 
   // Handle sort change
   const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSortBy = e.target.value;
     setSortBy(newSortBy);
-    filterAndSortCustomers(searchTerm, filterBy, newSortBy, sortOrder);
+    filterAndSortCustomers(searchTerm, filterBy, newSortBy, sortOrder, locationFilter);
   };
 
   // Handle sort order toggle
   const toggleSortOrder = () => {
     const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
     setSortOrder(newOrder);
-    filterAndSortCustomers(searchTerm, filterBy, sortBy, newOrder);
+    filterAndSortCustomers(searchTerm, filterBy, sortBy, newOrder, locationFilter);
   };
 
   // Handle filter change
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newFilter = e.target.value;
     setFilterBy(newFilter);
-    filterAndSortCustomers(searchTerm, newFilter, sortBy, sortOrder);
+    filterAndSortCustomers(searchTerm, newFilter, sortBy, sortOrder, locationFilter);
+  };
+
+  // Handle location filter change
+  const handleLocationFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLocation = e.target.value;
+    setLocationFilter(newLocation);
+    filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, newLocation);
   };
 
   useEffect(() => {
@@ -389,8 +429,8 @@ export default function Home() {
   
   // Update filtered customers when customers change
   useEffect(() => {
-    filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder);
-  }, [customers, searchTerm, filterBy, sortBy, sortOrder]);
+    filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
+  }, [customers, searchTerm, filterBy, sortBy, sortOrder, locationFilter]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 py-4 md:py-8">
@@ -471,6 +511,21 @@ export default function Home() {
                   <option value="past">Past Installations</option>
                   <option value="this_week">This Week</option>
                   <option value="this_month">This Month</option>
+                </select>
+              </div>
+
+              {/* Location Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-black">Location:</label>
+                <select 
+                  value={locationFilter}
+                  onChange={handleLocationFilterChange}
+                  className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Locations</option>
+                  {getUniqueLocations().map((location) => (
+                    <option key={location} value={location}>{location}</option>
+                  ))}
                 </select>
               </div>
 
