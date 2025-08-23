@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import LoadingSpinner from './components/LoadingSpinner';
 import { supabase, Customer } from '../lib/supabase';
 import InstallationCalendar from './components/InstallationCalendar';
@@ -22,6 +23,7 @@ interface CustomerInfo {
 }
 
 export default function Home() {
+  const router = useRouter();
   // Parse a YYYY-MM-DD string as a local-timezone date (avoids UTC shift)
   const parseDateLocal = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
   const [inputText, setInputText] = useState('');
@@ -32,6 +34,9 @@ export default function Home() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -47,6 +52,50 @@ export default function Home() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) {
+          console.error('Auth error:', error);
+          router.push('/login');
+          return;
+        }
+        
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+        
+        setUser(user);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        router.push('/login');
+      } finally {
+        setIsLoadingAuth(false);
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setIsAuthenticated(false);
+          router.push('/login');
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          setUser(session.user);
+          setIsAuthenticated(true);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [router]);
 
   // Calculate email notification dates
   const getEmailSchedule = (installationDate: string) => {
@@ -63,10 +112,6 @@ export default function Home() {
       followUp: followUp.toLocaleDateString()
     };
   };
-
-
-
-
 
   const formatCustomerInfo = async () => {
     if (!inputText.trim()) {
@@ -113,7 +158,7 @@ export default function Home() {
   };
 
   const saveCustomer = async () => {
-    if (!formattedInfo) return;
+    if (!formattedInfo || !user) return;
 
     setIsSaving(true);
     try {
@@ -121,6 +166,7 @@ export default function Home() {
         .from('customers')
         .insert([
           {
+            user_id: user.id,
             name: formattedInfo.name,
             email: formattedInfo.email,
             phone: formattedInfo.phone,
@@ -173,10 +219,13 @@ export default function Home() {
   };
 
   const loadCustomers = async () => {
+    if (!user) return;
+    
     try {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -193,7 +242,8 @@ export default function Home() {
       const { error } = await supabase
         .from('customers')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id); // Ensure user can only delete their own customers
 
       if (error) throw error;
       loadCustomers();
@@ -225,7 +275,7 @@ export default function Home() {
   };
 
   const updateCustomer = async () => {
-    if (!editingCustomer) return;
+    if (!editingCustomer || !user) return;
 
     setIsUpdating(true);
     try {
@@ -246,7 +296,8 @@ export default function Home() {
           referral_source: editingCustomer.is_referral ? (editingCustomer.referral_source || '') : null,
           lead_size: editingCustomer.lead_size || '2GIG',
         })
-        .eq('id', editingCustomer.id);
+        .eq('id', editingCustomer.id)
+        .eq('user_id', user.id); // Ensure user can only update their own customers
 
       if (error) throw error;
 
@@ -423,14 +474,31 @@ export default function Home() {
     filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, newLocation);
   };
 
+  // Load customers when user is authenticated
   useEffect(() => {
-    loadCustomers();
-  }, []);
+    if (isAuthenticated && user) {
+      loadCustomers();
+    }
+  }, [isAuthenticated, user]);
   
   // Update filtered customers when customers change
   useEffect(() => {
     filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
   }, [customers, searchTerm, filterBy, sortBy, sortOrder, locationFilter]);
+
+  // Show loading while checking authentication
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // Show login redirect if not authenticated
+  if (!isAuthenticated) {
+    return null; // Router will handle redirect
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 py-4 md:py-8">
@@ -440,6 +508,17 @@ export default function Home() {
             Sales Pro Tracker
           </h1>
           <p className="text-sm md:text-base text-gray-600">Your door-to-door sales assistant</p>
+          <div className="flex items-center justify-center gap-4 mt-2">
+            <span className="text-xs text-gray-500">Logged in as: {user?.email}</span>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut();
+              }}
+              className="text-xs text-red-600 hover:text-red-800 underline"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
         
         <Navbar activeSection={activeSection} onSectionChange={handleSectionChange} />
