@@ -355,6 +355,8 @@ export default function Home() {
       filtered = filtered.filter(customer => customer.status === 'cancelled');
     } else if (filter === 'completed') {
       filtered = filtered.filter(customer => customer.status === 'completed');
+    } else if (filter === 'paid') {
+      filtered = filtered.filter(customer => customer.status === 'paid');
     } else if (filter === 'referrals') {
       filtered = filtered.filter(customer => customer.is_referral === true);
     }
@@ -419,8 +421,8 @@ export default function Home() {
           bValue = b.email.toLowerCase();
           break;
         case 'status':
-          // Define an order for statuses: cancelled first, then completed, then active
-          const statusOrder = { 'cancelled': 1, 'completed': 2, 'active': 3, 'undefined': 4 };
+          // Define an order for statuses: cancelled first, then completed, then paid, then active
+          const statusOrder = { 'cancelled': 1, 'completed': 2, 'paid': 3, 'active': 4, 'undefined': 5 };
           aValue = statusOrder[a.status || 'undefined'];
           bValue = statusOrder[b.status || 'undefined'];
           break;
@@ -585,6 +587,7 @@ export default function Home() {
               <option value="active">In Progress Customers</option>
                   <option value="cancelled">Cancelled Customers</option>
                   <option value="completed">Completed Installations</option>
+                  <option value="paid">Paid Customers</option>
                   <option value="referrals">Referrals</option>
                   <option value="upcoming">Upcoming Installations</option>
                   <option value="past">Past Installations</option>
@@ -665,13 +668,14 @@ export default function Home() {
                                 value={editingCustomer.status || 'active'}
                                 onChange={(e) => setEditingCustomer({ 
                                   ...editingCustomer, 
-                                  status: e.target.value as 'active' | 'cancelled' | 'completed' 
+                                  status: e.target.value as 'active' | 'cancelled' | 'completed' | 'paid' 
                                 })}
                                 className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                               >
                 <option value="active">In Progress</option>
                                 <option value="cancelled">Cancelled</option>
                                 <option value="completed">Completed</option>
+                                <option value="paid">Paid</option>
                               </select>
                             </div>
                             <div>
@@ -816,6 +820,8 @@ export default function Home() {
                                       ? 'bg-green-100 text-green-800' 
                                       : customer.status === 'cancelled'
                                       ? 'bg-red-100 text-red-800'
+                                      : customer.status === 'paid'
+                                      ? 'bg-purple-100 text-purple-800'
                                       : 'bg-blue-100 text-blue-800'
                                   }`}>
                                     {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
