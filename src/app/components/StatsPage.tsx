@@ -20,6 +20,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
   const [activeCustomers, setActiveCustomers] = useState<number>(0);
   const [cancelledCustomers, setCancelledCustomers] = useState<number>(0);
   const [completedCustomers, setCompletedCustomers] = useState<number>(0);
+  const [paidCustomers, setPaidCustomers] = useState<number>(0);
   const [referralCustomers, setReferralCustomers] = useState<number>(0);
   const [referralSources, setReferralSources] = useState<{source: string, count: number}[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
@@ -65,6 +66,9 @@ export default function StatsPage({ customers }: StatsPageProps) {
     
     const completed = customers.filter(c => c.status === 'completed');
     setCompletedCustomers(completed.length);
+    
+    const paid = customers.filter(c => c.status === 'paid');
+    setPaidCustomers(paid.length);
     
     // Referral statistics
     const referrals = customers.filter(c => c.is_referral === true);
@@ -294,6 +298,29 @@ export default function StatsPage({ customers }: StatsPageProps) {
         >
           <p className="text-sm text-black">Total Referrals</p>
           <p className="text-2xl font-bold text-pink-700">{referralCustomers}</p>
+        </div>
+        {/* Paid Customers */}
+        <div
+          className="bg-purple-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.status === 'paid');
+            setModalCustomers(list);
+            setModalTitle(`Paid Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.status === 'paid');
+              setModalCustomers(list);
+              setModalTitle(`Paid Customers (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
+          <p className="text-sm text-black">Paid Customers</p>
+          <p className="text-2xl font-bold text-purple-700">{paidCustomers}</p>
         </div>
         {/* Cancelled */}
         <div
@@ -618,6 +645,38 @@ export default function StatsPage({ customers }: StatsPageProps) {
             <div 
               className="bg-blue-600 h-2.5 rounded-full" 
               style={{ width: `${totalCustomers > 0 ? (completedCustomers / totalCustomers) * 100 : 0}%` }}
+            ></div>
+          </div>
+        </div>
+        
+        {/* Paid Customers */}
+        <div
+          className="mb-3 cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.status === 'paid');
+            setModalCustomers(list);
+            setModalTitle(`Paid Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.status === 'paid');
+              setModalCustomers(list);
+              setModalTitle(`Paid Customers (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
+          <div className="flex justify-between mb-1">
+            <span className="text-sm font-medium text-black">Paid Customers</span>
+            <span className="text-sm font-medium text-black">{paidCustomers} ({totalCustomers > 0 ? Math.round((paidCustomers / totalCustomers) * 100) : 0}%)</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div 
+              className="bg-purple-600 h-2.5 rounded-full" 
+              style={{ width: `${totalCustomers > 0 ? (paidCustomers / totalCustomers) * 100 : 0}%` }}
             ></div>
           </div>
         </div>

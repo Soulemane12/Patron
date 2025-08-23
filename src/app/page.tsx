@@ -230,6 +230,15 @@ export default function Home() {
 
       if (error) throw error;
       const loadedCustomers = data || [];
+      
+      // Debug logging to check actual status values
+      console.log('Loaded customers with statuses:', loadedCustomers.map(c => ({
+        name: c.name,
+        status: c.status,
+        installation_date: c.installation_date,
+        created_at: c.created_at
+      })));
+      
       setCustomers(loadedCustomers);
       setFilteredCustomers(loadedCustomers);
     } catch (error) {
@@ -822,7 +831,9 @@ export default function Home() {
                                       ? 'bg-red-100 text-red-800'
                                       : customer.status === 'paid'
                                       ? 'bg-purple-100 text-purple-800'
-                                      : 'bg-blue-100 text-blue-800'
+                                      : customer.status === 'completed'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-gray-100 text-gray-800'
                                   }`}>
                                     {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
                                   </span>
@@ -832,6 +843,10 @@ export default function Home() {
                                     Referral
                                   </span>
                                 )}
+                                {/* Debug: Show raw status value */}
+                                <span className="text-xs text-gray-500">
+                                  (DB: {customer.status || 'null'})
+                                </span>
                               </div>
                             </div>
                             <p className="text-sm md:text-base text-black">
