@@ -64,7 +64,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
     const cancelled = customers.filter(c => c.status === 'cancelled');
     setCancelledCustomers(cancelled.length);
     
-    const completed = customers.filter(c => c.status === 'completed');
+    const completed = customers.filter(c => c.status === 'completed' || c.status === 'paid');
     setCompletedCustomers(completed.length);
     
     const paid = customers.filter(c => c.status === 'paid');

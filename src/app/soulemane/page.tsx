@@ -83,7 +83,7 @@ export default function AdminPage() {
     const userCustomersList = customers.filter(c => c.user_id === userId);
     const total = userCustomersList.length;
     const active = userCustomersList.filter(c => c.status === 'active' || c.status === undefined).length;
-    const completed = userCustomersList.filter(c => c.status === 'completed').length;
+    const completed = userCustomersList.filter(c => c.status === 'completed' || c.status === 'paid').length;
     const paid = userCustomersList.filter(c => c.status === 'paid').length;
     const cancelled = userCustomersList.filter(c => c.status === 'cancelled').length;
     
@@ -143,9 +143,9 @@ export default function AdminPage() {
                   <p className="text-2xl font-bold text-green-700">{customers.length}</p>
                 </div>
                 <div className="bg-yellow-50 p-4 rounded-lg text-center">
-                  <p className="text-sm text-gray-600">Active Customers</p>
+                  <p className="text-sm text-gray-600">Completed Customers</p>
                   <p className="text-2xl font-bold text-yellow-700">
-                    {customers.filter(c => c.status === 'active' || c.status === undefined).length}
+                    {customers.filter(c => c.status === 'completed' || c.status === 'paid').length}
                   </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg text-center">

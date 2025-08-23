@@ -162,6 +162,9 @@ export default function Home() {
 
     setIsSaving(true);
     try {
+      // Determine status - if leadSize indicates paid, set to completed
+      let status = 'active'; // Default status for new customers
+      
       const { data, error } = await supabase
         .from('customers')
         .insert([
@@ -173,7 +176,7 @@ export default function Home() {
             service_address: formattedInfo.serviceAddress,
             installation_date: formattedInfo.installationDate,
             installation_time: formattedInfo.installationTime,
-            status: 'active', // Default status for new customers
+            status: status,
             is_referral: formattedInfo.isReferral || false,
             referral_source: formattedInfo.isReferral ? formattedInfo.referralSource : null,
             lead_size: formattedInfo.leadSize || '2GIG', // Default to 2GIG as requested
@@ -289,7 +292,12 @@ export default function Home() {
     setIsUpdating(true);
     try {
       // Set default status to 'active' if not specified
-      const status = editingCustomer.status || 'active';
+      let status = editingCustomer.status || 'active';
+      
+      // If status is 'paid', automatically set to 'completed' as well
+      if (status === 'paid') {
+        status = 'completed';
+      }
       
       const { error } = await supabase
         .from('customers')
