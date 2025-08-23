@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -10,6 +10,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accountPaused, setAccountPaused] = useState(false);
+
+  // Check for account paused message in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('message') === 'account_paused') {
+      setAccountPaused(true);
+    }
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +59,13 @@ export default function LoginPage() {
             />
           </div>
           {error && <p className="text-red-600 text-sm">{error}</p>}
+          {accountPaused && (
+            <div className="bg-red-50 border border-red-200 rounded p-3">
+              <p className="text-red-800 text-sm">
+                Your account has been paused by an administrator. Please contact support for assistance.
+              </p>
+            </div>
+          )}
           <button
             type="submit"
             disabled={loading}

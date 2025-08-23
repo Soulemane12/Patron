@@ -68,6 +68,20 @@ export default function Home() {
           return;
         }
         
+        // Check if user is paused
+        const { data: userStatus } = await supabase
+          .from('user_status')
+          .select('is_paused')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (userStatus?.is_paused) {
+          // User is paused, redirect to login with message
+          await supabase.auth.signOut();
+          router.push('/login?message=account_paused');
+          return;
+        }
+        
         setUser(user);
         setIsAuthenticated(true);
       } catch (error) {
@@ -88,6 +102,19 @@ export default function Home() {
           setIsAuthenticated(false);
           router.push('/login');
         } else if (event === 'SIGNED_IN' && session?.user) {
+          // Check if user is paused on sign in
+          const { data: userStatus } = await supabase
+            .from('user_status')
+            .select('is_paused')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          if (userStatus?.is_paused) {
+            await supabase.auth.signOut();
+            router.push('/login?message=account_paused');
+            return;
+          }
+          
           setUser(session.user);
           setIsAuthenticated(true);
         }

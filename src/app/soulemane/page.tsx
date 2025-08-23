@@ -9,6 +9,8 @@ interface AdminUser {
   email: string;
   created_at: string;
   last_sign_in_at: string;
+  is_paused?: boolean;
+  paused_at?: string;
 }
 
 interface AdminCustomer {
@@ -37,6 +39,7 @@ export default function AdminPage() {
   const [customers, setCustomers] = useState<AdminCustomer[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [userCustomers, setUserCustomers] = useState<AdminCustomer[]>([]);
+  const [pausingUser, setPausingUser] = useState<string | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +91,32 @@ export default function AdminPage() {
     const cancelled = userCustomersList.filter(c => c.status === 'cancelled').length;
     
     return { total, active, completed, paid, cancelled };
+  };
+
+  const handlePauseUser = async (userId: string, action: 'pause' | 'unpause') => {
+    setPausingUser(userId);
+    try {
+      const response = await fetch('/api/admin/users/pause', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer soulemane'
+        },
+        body: JSON.stringify({ userId, action })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to pause/unpause user');
+      }
+
+      // Reload data to reflect changes
+      loadAllData();
+    } catch (error) {
+      console.error('Error pausing/unpausing user:', error);
+      alert('Failed to pause/unpause user');
+    } finally {
+      setPausingUser(null);
+    }
   };
 
   if (!isAuthenticated) {
@@ -167,45 +196,79 @@ export default function AdminPage() {
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">All Users</h2>
                 <div className="overflow-x-auto">
                   <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Sign In</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customers</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
+                                         <thead className="bg-gray-50">
+                       <tr>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Sign In</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customers</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                       </tr>
+                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {users.map((user) => {
                         const stats = getCustomerStats(user.id);
-                        return (
-                          <tr key={user.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm text-gray-900">{user.email}</td>
-                            <td className="px-4 py-3 text-sm text-gray-500">
-                              {new Date(user.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-500">
-                              {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : 'Never'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900">
-                              <div className="space-y-1">
-                                <div>Total: {stats.total}</div>
-                                <div className="text-xs text-gray-500">
-                                  Active: {stats.active} | Completed: {stats.completed} | Paid: {stats.paid} | Cancelled: {stats.cancelled}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <button
-                                onClick={() => viewUserCustomers(user)}
-                                className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600"
-                              >
-                                View Customers
-                              </button>
-                            </td>
-                          </tr>
-                        );
+                                                 return (
+                           <tr key={user.id} className={`hover:bg-gray-50 ${user.is_paused ? 'bg-red-50' : ''}`}>
+                             <td className="px-4 py-3 text-sm text-gray-900">{user.email}</td>
+                             <td className="px-4 py-3 text-sm">
+                               <span className={`px-2 py-1 text-xs rounded-full ${
+                                 user.is_paused 
+                                   ? 'bg-red-100 text-red-800' 
+                                   : 'bg-green-100 text-green-800'
+                               }`}>
+                                 {user.is_paused ? 'PAUSED' : 'ACTIVE'}
+                               </span>
+                               {user.is_paused && user.paused_at && (
+                                 <div className="text-xs text-gray-500 mt-1">
+                                   Paused: {new Date(user.paused_at).toLocaleDateString()}
+                                 </div>
+                               )}
+                             </td>
+                             <td className="px-4 py-3 text-sm text-gray-500">
+                               {new Date(user.created_at).toLocaleDateString()}
+                             </td>
+                             <td className="px-4 py-3 text-sm text-gray-500">
+                               {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : 'Never'}
+                             </td>
+                             <td className="px-4 py-3 text-sm text-gray-900">
+                               <div className="space-y-1">
+                                 <div>Total: {stats.total}</div>
+                                 <div className="text-xs text-gray-500">
+                                   Active: {stats.active} | Completed: {stats.completed} | Paid: {stats.paid} | Cancelled: {stats.cancelled}
+                                 </div>
+                               </div>
+                             </td>
+                             <td className="px-4 py-3 text-sm">
+                               <div className="flex gap-2">
+                                 <button
+                                   onClick={() => viewUserCustomers(user)}
+                                   className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600"
+                                 >
+                                   View Customers
+                                 </button>
+                                 {user.is_paused ? (
+                                   <button
+                                     onClick={() => handlePauseUser(user.id, 'unpause')}
+                                     disabled={pausingUser === user.id}
+                                     className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 disabled:opacity-50"
+                                   >
+                                     {pausingUser === user.id ? 'Unpausing...' : 'Unpause'}
+                                   </button>
+                                 ) : (
+                                   <button
+                                     onClick={() => handlePauseUser(user.id, 'pause')}
+                                     disabled={pausingUser === user.id}
+                                     className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 disabled:opacity-50"
+                                   >
+                                     {pausingUser === user.id ? 'Pausing...' : 'Pause'}
+                                   </button>
+                                 )}
+                               </div>
+                             </td>
+                           </tr>
+                         );
                       })}
                     </tbody>
                   </table>
