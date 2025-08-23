@@ -11,7 +11,7 @@ CREATE TABLE customers (
   service_address TEXT NOT NULL,
   installation_date DATE NOT NULL,
   installation_time VARCHAR(100) NOT NULL,
-  status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'completed', 'paid')),
+  status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'completed', 'paid', 'not_paid')),
   is_referral BOOLEAN DEFAULT false,
   referral_source VARCHAR(255),
   lead_size VARCHAR(10) DEFAULT '2GIG',

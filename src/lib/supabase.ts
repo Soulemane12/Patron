@@ -16,7 +16,7 @@ export interface Customer {
   installation_time: string;
   created_at: string;
   updated_at: string;
-  status?: 'active' | 'cancelled' | 'completed' | 'paid';
+  status?: 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid';
   is_referral?: boolean;
   referral_source?: string;
   lead_size?: '500MB' | '1GIG' | '2GIG';

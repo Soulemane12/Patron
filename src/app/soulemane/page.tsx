@@ -22,7 +22,7 @@ interface AdminCustomer {
   service_address: string;
   installation_date: string;
   installation_time: string;
-  status?: 'active' | 'cancelled' | 'completed' | 'paid';
+  status?: 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid';
   is_referral?: boolean;
   referral_source?: string;
   lead_size?: '500MB' | '1GIG' | '2GIG';
@@ -87,10 +87,11 @@ export default function AdminPage() {
     const total = userCustomersList.length;
     const active = userCustomersList.filter(c => c.status === 'active' || c.status === undefined).length;
     const completed = userCustomersList.filter(c => c.status === 'completed' || c.status === 'paid').length;
+    const notPaid = userCustomersList.filter(c => c.status === 'not_paid').length;
     const paid = userCustomersList.filter(c => c.status === 'paid').length;
     const cancelled = userCustomersList.filter(c => c.status === 'cancelled').length;
     
-    return { total, active, completed, paid, cancelled };
+    return { total, active, completed, notPaid, paid, cancelled };
   };
 
   const handlePauseUser = async (userId: string, action: 'pause' | 'unpause') => {
@@ -236,7 +237,7 @@ export default function AdminPage() {
                                <div className="space-y-1">
                                  <div>Total: {stats.total}</div>
                                  <div className="text-xs text-gray-500">
-                                   Active: {stats.active} | Completed: {stats.completed} | Paid: {stats.paid} | Cancelled: {stats.cancelled}
+                                   Active: {stats.active} | Completed: {stats.completed} | Not Paid: {stats.notPaid} | Paid: {stats.paid} | Cancelled: {stats.cancelled}
                                  </div>
                                </div>
                              </td>
@@ -310,19 +311,21 @@ export default function AdminPage() {
                                 <div className="text-xs text-gray-500">{customer.installation_time}</div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-sm">
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                customer.status === 'active' || customer.status === undefined
-                                  ? 'bg-green-100 text-green-800'
-                                  : customer.status === 'cancelled'
-                                  ? 'bg-red-100 text-red-800'
-                                  : customer.status === 'paid'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}>
-                                {customer.status || 'active'}
-                              </span>
-                            </td>
+                                                         <td className="px-4 py-3 text-sm">
+                               <span className={`px-2 py-1 text-xs rounded-full ${
+                                 customer.status === 'active' || customer.status === undefined
+                                   ? 'bg-green-100 text-green-800'
+                                   : customer.status === 'cancelled'
+                                   ? 'bg-red-100 text-red-800'
+                                   : customer.status === 'paid'
+                                   ? 'bg-purple-100 text-purple-800'
+                                   : customer.status === 'not_paid'
+                                   ? 'bg-orange-100 text-orange-800'
+                                   : 'bg-blue-100 text-blue-800'
+                               }`}>
+                                 {customer.status === 'not_paid' ? 'Not Paid' : customer.status || 'active'}
+                               </span>
+                             </td>
                             <td className="px-4 py-3 text-sm text-gray-900">{customer.lead_size || '2GIG'}</td>
                             <td className="px-4 py-3 text-sm text-gray-500">
                               {new Date(customer.created_at).toLocaleDateString()}
