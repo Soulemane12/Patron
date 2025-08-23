@@ -86,7 +86,7 @@ export default function AdminPage() {
     const userCustomersList = customers.filter(c => c.user_id === userId);
     const total = userCustomersList.length;
     const active = userCustomersList.filter(c => c.status === 'active' || c.status === undefined).length;
-    const completed = userCustomersList.filter(c => c.status === 'completed' || c.status === 'paid').length;
+    const completed = userCustomersList.filter(c => c.status === 'completed' || c.status === 'not_paid' || c.status === 'paid').length;
     const notPaid = userCustomersList.filter(c => c.status === 'not_paid').length;
     const paid = userCustomersList.filter(c => c.status === 'paid').length;
     const cancelled = userCustomersList.filter(c => c.status === 'cancelled').length;

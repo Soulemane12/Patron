@@ -65,7 +65,9 @@ export default function StatsPage({ customers }: StatsPageProps) {
     const cancelled = customers.filter(c => c.status === 'cancelled');
     setCancelledCustomers(cancelled.length);
     
-    const completed = customers.filter(c => c.status === 'completed' || c.status === 'paid');
+    // For analytics, "completed" should include both 'completed' and 'not_paid' statuses
+    // since both represent completed installations
+    const completed = customers.filter(c => c.status === 'completed' || c.status === 'not_paid' || c.status === 'paid');
     setCompletedCustomers(completed.length);
     
     const notPaid = customers.filter(c => c.status === 'not_paid');
