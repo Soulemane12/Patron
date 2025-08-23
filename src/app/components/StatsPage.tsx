@@ -169,7 +169,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
       <h2 className="text-lg md:text-xl font-semibold mb-4 text-blue-800">Sales Analytics</h2>
       
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-6">
         {/* Total Customers */}
         <div
           className="bg-blue-50 p-4 rounded-lg text-center cursor-pointer"
@@ -216,22 +216,20 @@ export default function StatsPage({ customers }: StatsPageProps) {
           <p className="text-sm text-black">Upcoming Installations</p>
           <p className="text-2xl font-bold text-green-700">{upcomingInstallations}</p>
         </div>
-        {/* Completed Installations (by date in past) */}
+        {/* Completed Installations (by status) */}
         <div
           className="bg-yellow-50 p-4 rounded-lg text-center cursor-pointer"
           role="button"
           tabIndex={0}
           onClick={() => {
-            const todayString = new Date().toISOString().split('T')[0];
-            const list = customers.filter(c => c.installation_date < todayString);
+            const list = customers.filter(c => c.status === 'completed');
             setModalCustomers(list);
             setModalTitle(`Completed Installations (${list.length})`);
             setIsModalOpen(true);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-              const todayString = new Date().toISOString().split('T')[0];
-              const list = customers.filter(c => c.installation_date < todayString);
+              const list = customers.filter(c => c.status === 'completed');
               setModalCustomers(list);
               setModalTitle(`Completed Installations (${list.length})`);
               setIsModalOpen(true);
@@ -239,7 +237,32 @@ export default function StatsPage({ customers }: StatsPageProps) {
           }}
         >
           <p className="text-sm text-black">Completed Installations</p>
-          <p className="text-2xl font-bold text-yellow-700">{pastInstallations}</p>
+          <p className="text-2xl font-bold text-yellow-700">{completedCustomers}</p>
+        </div>
+        {/* Past Installations (by date) */}
+        <div
+          className="bg-orange-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const todayString = new Date().toISOString().split('T')[0];
+            const list = customers.filter(c => c.installation_date < todayString);
+            setModalCustomers(list);
+            setModalTitle(`Past Installations (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const todayString = new Date().toISOString().split('T')[0];
+              const list = customers.filter(c => c.installation_date < todayString);
+              setModalCustomers(list);
+              setModalTitle(`Past Installations (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
+          <p className="text-sm text-black">Past Installations</p>
+          <p className="text-2xl font-bold text-orange-700">{pastInstallations}</p>
         </div>
         {/* This Month */}
         <div
