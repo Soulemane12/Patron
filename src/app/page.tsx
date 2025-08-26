@@ -249,7 +249,11 @@ export default function Home() {
     if (!formattedInfo || !user) return;
 
     setIsSaving(true);
+    setError(''); // Clear any previous errors
+    
     try {
+      console.log('Saving customer...');
+      
       // Determine status - if leadSize indicates paid, set to completed
       let status = 'active'; // Default status for new customers
       
@@ -272,17 +276,35 @@ export default function Home() {
         ])
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw new Error(`Failed to save customer: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('No data returned from save operation');
+      }
+
+      console.log('Customer saved successfully:', data[0]);
 
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 3000);
-      loadCustomers();
+      
+      // Clear the form first
       clearForm();
+      
+      // Add a small delay to ensure the database operation is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Reload customers with the new data
+      await loadCustomers();
       
       // Switch to customers view after saving
       setActiveSection('pipeline');
+      
     } catch (error) {
       console.error('Error saving customer:', error);
+      setError(error instanceof Error ? error.message : 'Failed to save customer');
     } finally {
       setIsSaving(false);
     }
@@ -310,17 +332,27 @@ export default function Home() {
   };
 
   const loadCustomers = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user available, skipping loadCustomers');
+      return;
+    }
     
     try {
+      console.log('Loading customers for user:', user.id);
+      
       const { data, error } = await supabase
         .from('customers')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error loading customers:', error);
+        throw error;
+      }
+      
       const loadedCustomers = data || [];
+      console.log(`Loaded ${loadedCustomers.length} customers`);
       
       // Debug logging to check actual status values
       console.log('Loaded customers with statuses:', loadedCustomers.map(c => ({
@@ -330,10 +362,13 @@ export default function Home() {
         created_at: c.created_at
       })));
       
+      // Update both states
       setCustomers(loadedCustomers);
       setFilteredCustomers(loadedCustomers);
+      
     } catch (error) {
       console.error('Error loading customers:', error);
+      // Don't throw here, just log the error to prevent breaking the UI
     }
   };
 
@@ -379,15 +414,15 @@ export default function Home() {
 
     setIsUpdating(true);
     try {
+      console.log('Updating customer with status:', editingCustomer.status);
+      
       // Set default status to 'active' if not specified
       let status = editingCustomer.status || 'active';
       
-      // If status is 'paid', automatically set to 'completed' as well
-      if (status === 'paid') {
-        status = 'completed';
-      }
+      // Remove the problematic logic that changes 'paid' to 'completed'
+      // Each status should remain as selected by the user
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('customers')
         .update({
           name: editingCustomer.name,
@@ -402,12 +437,24 @@ export default function Home() {
           lead_size: editingCustomer.lead_size || '2GIG',
         })
         .eq('id', editingCustomer.id)
-        .eq('user_id', user.id); // Ensure user can only update their own customers
+        .eq('user_id', user.id) // Ensure user can only update their own customers
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error updating customer:', error);
+        throw error;
+      }
+
+      console.log('Customer updated successfully:', data);
 
       setEditingCustomer(null);
-      loadCustomers();
+      
+      // Add a small delay to ensure the database operation is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Reload customers with the updated data
+      await loadCustomers();
+      
     } catch (error) {
       console.error('Error updating customer:', error);
     } finally {
@@ -545,6 +592,13 @@ export default function Home() {
       }
     });
     
+    console.log('Filtered customers result:', {
+      originalCount: customers.length,
+      filteredCount: filtered.length,
+      filter,
+      searchTerm,
+      filteredCustomers: filtered.map(c => ({ name: c.name, status: c.status }))
+    });
     setFilteredCustomers(filtered);
   };
 
@@ -592,6 +646,12 @@ export default function Home() {
   
   // Update filtered customers when customers change
   useEffect(() => {
+    console.log('Filtering customers:', {
+      totalCustomers: customers.length,
+      filterBy,
+      searchTerm,
+      customersWithStatus: customers.map(c => ({ name: c.name, status: c.status }))
+    });
     filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
   }, [customers, searchTerm, filterBy, sortBy, sortOrder, locationFilter]);
 
@@ -890,7 +950,7 @@ export default function Home() {
                               className="px-3 py-1 bg-green-600 text-white text-xs md:text-sm rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
                             >
                               {isUpdating ? <LoadingSpinner /> : null}
-                              Save Changes
+                              {isUpdating ? 'Saving...' : 'Save Changes'}
                             </button>
                             <button
                               onClick={cancelEdit}
@@ -1212,7 +1272,7 @@ export default function Home() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z" />
                 </svg>
-                Add to Pipeline
+                {isSaving ? 'Saving...' : 'Add to Pipeline'}
               </span>
             </button>
             {showSaved && (
