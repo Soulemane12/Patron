@@ -51,6 +51,27 @@ export default function Home() {
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
+
+  // Track user activity to prevent automatic logouts
+  useEffect(() => {
+    const updateActivity = () => {
+      setLastActivity(Date.now());
+    };
+
+    // Track various user activities
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => {
+      document.addEventListener(event, updateActivity, true);
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, updateActivity, true);
+      });
+    };
+  }, []);
 
   // Check authentication status with improved session handling
   useEffect(() => {
@@ -74,8 +95,13 @@ export default function Home() {
             setTimeout(checkAuth, 2000); // Retry after 2 seconds
             return;
           }
-          if (mounted) {
+          // Only logout if we've exhausted all retry attempts and it's a critical error
+          if (mounted && sessionError.message?.includes('Invalid JWT')) {
+            console.log('Critical auth error, redirecting to login');
             router.push('/login');
+          } else {
+            console.log('Non-critical auth error, continuing with current session');
+            // Don't logout, just continue with current state
           }
           return;
         }
@@ -128,8 +154,13 @@ export default function Home() {
             setTimeout(checkAuth, 2000); // Retry after 2 seconds
             return;
           }
-          if (mounted) {
+          // Only logout on critical errors
+          if (mounted && error.message?.includes('Invalid JWT')) {
+            console.log('Critical auth error, redirecting to login');
             router.push('/login');
+          } else {
+            console.log('Non-critical auth error, continuing with current session');
+            // Don't logout, just continue with current state
           }
           return;
         }
@@ -249,19 +280,49 @@ export default function Home() {
       }
     );
 
-    // Set up periodic session refresh to prevent timeouts
+    // Set up aggressive session refresh to prevent timeouts
     const sessionRefreshInterval = setInterval(async () => {
       if (mounted && isAuthenticated && user) {
         try {
-          const { data: { session }, error } = await supabase.auth.getSession();
-          if (!error && session) {
-            console.log('Session refresh check - session valid');
+          setIsRefreshingSession(true);
+          
+          // Check if user has been active in the last 30 minutes
+          const timeSinceActivity = Date.now() - lastActivity;
+          const thirtyMinutes = 30 * 60 * 1000;
+          
+          if (timeSinceActivity < thirtyMinutes) {
+            // User is active, refresh session
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (!error && session) {
+              console.log('Session refresh check - session valid, user active');
+              
+              // Force token refresh if needed
+              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+              if (!refreshError && refreshData.session) {
+                console.log('Session refreshed successfully');
+                setUser(refreshData.user);
+              }
+            } else {
+              console.log('Session refresh check - attempting to recover session');
+              // Try to get user data as fallback
+              const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+              if (!userError && currentUser) {
+                console.log('Recovered user session');
+                setUser(currentUser);
+                setIsAuthenticated(true);
+              }
+            }
+          } else {
+            console.log('User inactive for 30+ minutes, skipping session refresh');
           }
         } catch (error) {
           console.error('Session refresh check failed:', error);
+          // Don't logout on refresh errors, just log them
+        } finally {
+          setIsRefreshingSession(false);
         }
       }
-    }, 5 * 60 * 1000); // Check every 5 minutes
+    }, 2 * 60 * 1000); // Check every 2 minutes instead of 5
 
     return () => {
       mounted = false;
@@ -269,7 +330,7 @@ export default function Home() {
       clearInterval(sessionRefreshInterval);
       subscription.unsubscribe();
     };
-  }, [router, isAuthenticated, user]);
+  }, [router, isAuthenticated, user, lastActivity]);
 
   // Calculate email notification dates
   const getEmailSchedule = (installationDate: string) => {
@@ -765,10 +826,20 @@ export default function Home() {
           <p className="text-sm md:text-base text-gray-600">Your door-to-door sales assistant</p>
           <div className="flex items-center justify-center gap-4 mt-2">
             <span className="text-xs text-gray-500">Logged in as: {user?.email}</span>
+            {isRefreshingSession && (
+              <span className="text-xs text-blue-500 flex items-center gap-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                Refreshing session...
+              </span>
+            )}
           </div>
         </div>
         
-        <Navbar activeSection={activeSection} onSectionChange={handleSectionChange} />
+        <Navbar 
+          activeSection={activeSection} 
+          onSectionChange={handleSectionChange} 
+          isAdmin={user?.email === 'thechosen1351@gmail.com'}
+        />
 
 
         {/* Calendar View - Only shows installations for the selected date */}
