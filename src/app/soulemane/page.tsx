@@ -30,6 +30,20 @@ interface AdminCustomer {
   updated_at: string;
 }
 
+interface NewCustomerData {
+  user_id: string;
+  name: string;
+  email: string;
+  phone: string;
+  service_address: string;
+  installation_date: string;
+  installation_time: string;
+  status: 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid';
+  is_referral: boolean;
+  referral_source?: string;
+  lead_size: '500MB' | '1GIG' | '2GIG';
+}
+
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -40,6 +54,23 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [userCustomers, setUserCustomers] = useState<AdminCustomer[]>([]);
   const [pausingUser, setPausingUser] = useState<string | null>(null);
+  const [showAddLeadForm, setShowAddLeadForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<AdminCustomer | null>(null);
+  const [newCustomerData, setNewCustomerData] = useState<NewCustomerData>({
+    user_id: '',
+    name: '',
+    email: '',
+    phone: '',
+    service_address: '',
+    installation_date: '',
+    installation_time: '',
+    status: 'active',
+    is_referral: false,
+    referral_source: '',
+    lead_size: '2GIG'
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,6 +151,114 @@ export default function AdminPage() {
     }
   };
 
+  const handleAddCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomerData.user_id) {
+      alert('Please select a user');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/admin/customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer soulemane'
+        },
+        body: JSON.stringify(newCustomerData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add customer');
+      }
+
+      // Reset form and reload data
+      setNewCustomerData({
+        user_id: '',
+        name: '',
+        email: '',
+        phone: '',
+        service_address: '',
+        installation_date: '',
+        installation_time: '',
+        status: 'active',
+        is_referral: false,
+        referral_source: '',
+        lead_size: '2GIG'
+      });
+      setShowAddLeadForm(false);
+      loadAllData();
+      alert('Customer added successfully!');
+    } catch (error) {
+      console.error('Error adding customer:', error);
+      alert('Failed to add customer');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/admin/customers/${editingCustomer.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer soulemane'
+        },
+        body: JSON.stringify(editingCustomer)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update customer');
+      }
+
+      setEditingCustomer(null);
+      loadAllData();
+      alert('Customer updated successfully!');
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      alert('Failed to update customer');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    if (!confirm('Are you sure you want to delete this customer?')) return;
+
+    try {
+      const response = await fetch(`/api/admin/customers/${customerId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer soulemane'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete customer');
+      }
+
+      loadAllData();
+      alert('Customer deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      alert('Failed to delete customer');
+    }
+  };
+
+  const startEditingCustomer = (customer: AdminCustomer) => {
+    setEditingCustomer(customer);
+  };
+
+  const cancelEdit = () => {
+    setEditingCustomer(null);
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
@@ -191,6 +330,185 @@ export default function AdminPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Admin Actions */}
+              <div className="flex gap-4 mb-6">
+                <button
+                  onClick={() => setShowAddLeadForm(!showAddLeadForm)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  {showAddLeadForm ? 'Cancel Add Lead' : 'Add New Lead'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddLeadForm(false);
+                    setEditingCustomer(null);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  View All Data
+                </button>
+              </div>
+
+              {/* Add Lead Form */}
+              {showAddLeadForm && (
+                <div className="bg-gray-50 p-6 rounded-lg mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Add New Lead</h3>
+                  <form onSubmit={handleAddCustomer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assign to User</label>
+                      <select
+                        value={newCustomerData.user_id}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, user_id: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select User</option>
+                        {users.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.email} {user.is_paused ? '(PAUSED)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+                      <input
+                        type="text"
+                        value={newCustomerData.name}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, name: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={newCustomerData.email}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, email: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={newCustomerData.phone}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, phone: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Service Address</label>
+                      <input
+                        type="text"
+                        value={newCustomerData.service_address}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, service_address: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Installation Date</label>
+                      <input
+                        type="date"
+                        value={newCustomerData.installation_date}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, installation_date: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Installation Time</label>
+                      <input
+                        type="text"
+                        value={newCustomerData.installation_time}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, installation_time: e.target.value})}
+                        required
+                        placeholder="e.g., 2:00 PM"
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={newCustomerData.status}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, status: e.target.value as any})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="not_paid">Not Paid</option>
+                        <option value="paid">Paid</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Lead Size</label>
+                      <select
+                        value={newCustomerData.lead_size}
+                        onChange={(e) => setNewCustomerData({...newCustomerData, lead_size: e.target.value as any})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="500MB">500MB</option>
+                        <option value="1GIG">1GIG</option>
+                        <option value="2GIG">2GIG</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Is Referral?</label>
+                      <div className="flex items-center gap-4 mt-2">
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            name="is_referral"
+                            checked={newCustomerData.is_referral === true}
+                            onChange={() => setNewCustomerData({...newCustomerData, is_referral: true})}
+                            className="form-radio h-4 w-4 text-blue-600"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">Yes</span>
+                        </label>
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            name="is_referral"
+                            checked={newCustomerData.is_referral === false}
+                            onChange={() => setNewCustomerData({...newCustomerData, is_referral: false, referral_source: ''})}
+                            className="form-radio h-4 w-4 text-blue-600"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">No</span>
+                        </label>
+                      </div>
+                    </div>
+                    {newCustomerData.is_referral && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Referral Source</label>
+                        <input
+                          type="text"
+                          value={newCustomerData.referral_source || ''}
+                          onChange={(e) => setNewCustomerData({...newCustomerData, referral_source: e.target.value})}
+                          placeholder="Who referred this customer?"
+                          className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+                    <div className="md:col-span-2 lg:col-span-3">
+                      <button
+                        type="submit"
+                        disabled={isSaving}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      >
+                        {isSaving ? 'Adding...' : 'Add Customer'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {/* Users List */}
               <div>
@@ -294,6 +612,7 @@ export default function AdminPage() {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead Size</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -330,6 +649,22 @@ export default function AdminPage() {
                             <td className="px-4 py-3 text-sm text-gray-500">
                               {new Date(customer.created_at).toLocaleDateString()}
                             </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => startEditingCustomer(customer)}
+                                  className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCustomer(customer.id)}
+                                  className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -338,6 +673,156 @@ export default function AdminPage() {
                   {userCustomers.length === 0 && (
                     <p className="text-center py-8 text-gray-500">No customers found for this user.</p>
                   )}
+                </div>
+              )}
+
+              {/* Edit Customer Form */}
+              {editingCustomer && (
+                <div className="bg-gray-50 p-6 rounded-lg mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Edit Customer</h3>
+                  <form onSubmit={handleUpdateCustomer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+                      <input
+                        type="text"
+                        value={editingCustomer.name}
+                        onChange={(e) => setEditingCustomer({...editingCustomer, name: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editingCustomer.email}
+                        onChange={(e) => setEditingCustomer({...editingCustomer, email: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={editingCustomer.phone}
+                        onChange={(e) => setEditingCustomer({...editingCustomer, phone: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Service Address</label>
+                      <input
+                        type="text"
+                        value={editingCustomer.service_address}
+                        onChange={(e) => setEditingCustomer({...editingCustomer, service_address: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Installation Date</label>
+                      <input
+                        type="date"
+                        value={editingCustomer.installation_date}
+                        onChange={(e) => setEditingCustomer({...editingCustomer, installation_date: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Installation Time</label>
+                      <input
+                        type="text"
+                        value={editingCustomer.installation_time}
+                        onChange={(e) => setEditingCustomer({...editingCustomer, installation_time: e.target.value})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={editingCustomer.status || 'active'}
+                        onChange={(e) => setEditingCustomer({...editingCustomer, status: e.target.value as any})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="not_paid">Not Paid</option>
+                        <option value="paid">Paid</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Lead Size</label>
+                      <select
+                        value={editingCustomer.lead_size || '2GIG'}
+                        onChange={(e) => setEditingCustomer({...editingCustomer, lead_size: e.target.value as any})}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="500MB">500MB</option>
+                        <option value="1GIG">1GIG</option>
+                        <option value="2GIG">2GIG</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Is Referral?</label>
+                      <div className="flex items-center gap-4 mt-2">
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            name="edit_is_referral"
+                            checked={editingCustomer.is_referral === true}
+                            onChange={() => setEditingCustomer({...editingCustomer, is_referral: true})}
+                            className="form-radio h-4 w-4 text-blue-600"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">Yes</span>
+                        </label>
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            name="edit_is_referral"
+                            checked={editingCustomer.is_referral === false || editingCustomer.is_referral === undefined}
+                            onChange={() => setEditingCustomer({...editingCustomer, is_referral: false, referral_source: ''})}
+                            className="form-radio h-4 w-4 text-blue-600"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">No</span>
+                        </label>
+                      </div>
+                    </div>
+                    {editingCustomer.is_referral && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Referral Source</label>
+                        <input
+                          type="text"
+                          value={editingCustomer.referral_source || ''}
+                          onChange={(e) => setEditingCustomer({...editingCustomer, referral_source: e.target.value})}
+                          placeholder="Who referred this customer?"
+                          className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+                    <div className="md:col-span-2 lg:col-span-3 flex gap-4">
+                      <button
+                        type="submit"
+                        disabled={isUpdating}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        {isUpdating ? 'Updating...' : 'Update Customer'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
                 </div>
               )}
             </div>

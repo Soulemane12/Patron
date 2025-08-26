@@ -835,11 +835,7 @@ export default function Home() {
           </div>
         </div>
         
-        <Navbar 
-          activeSection={activeSection} 
-          onSectionChange={handleSectionChange} 
-          isAdmin={user?.email === 'thechosen1351@gmail.com'}
-        />
+        <Navbar activeSection={activeSection} onSectionChange={handleSectionChange} />
 
 
         {/* Calendar View - Only shows installations for the selected date */}
