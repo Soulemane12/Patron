@@ -228,14 +228,16 @@ export default function StatsPage({ customers }: StatsPageProps) {
           role="button"
           tabIndex={0}
           onClick={() => {
-            const list = customers.filter(c => c.status === 'completed');
+            // Include all completed installations: completed, not_paid, and paid
+            const list = customers.filter(c => c.status === 'completed' || c.status === 'not_paid' || c.status === 'paid');
             setModalCustomers(list);
             setModalTitle(`Completed Installations (${list.length})`);
             setIsModalOpen(true);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-              const list = customers.filter(c => c.status === 'completed');
+              // Include all completed installations: completed, not_paid, and paid
+              const list = customers.filter(c => c.status === 'completed' || c.status === 'not_paid' || c.status === 'paid');
               setModalCustomers(list);
               setModalTitle(`Completed Installations (${list.length})`);
               setIsModalOpen(true);
@@ -651,14 +653,16 @@ export default function StatsPage({ customers }: StatsPageProps) {
           role="button"
           tabIndex={0}
           onClick={() => {
-            const list = customers.filter(c => c.status === 'completed');
+            // Include all completed installations: completed, not_paid, and paid
+            const list = customers.filter(c => c.status === 'completed' || c.status === 'not_paid' || c.status === 'paid');
             setModalCustomers(list);
             setModalTitle(`Completed Installations (${list.length})`);
             setIsModalOpen(true);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-              const list = customers.filter(c => c.status === 'completed');
+              // Include all completed installations: completed, not_paid, and paid
+              const list = customers.filter(c => c.status === 'completed' || c.status === 'not_paid' || c.status === 'paid');
               setModalCustomers(list);
               setModalTitle(`Completed Installations (${list.length})`);
               setIsModalOpen(true);

@@ -52,79 +52,136 @@ export default function Home() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Check authentication status
+  // Check authentication status with improved session handling
   useEffect(() => {
     let mounted = true;
+    let authCheckAttempts = 0;
+    const maxAuthAttempts = 3;
 
     const checkAuth = async () => {
       try {
+        console.log('Checking authentication...');
+        
         // Get current session first
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
           console.error('Session error:', sessionError);
+          // Don't immediately logout on session errors, try to refresh
+          if (authCheckAttempts < maxAuthAttempts) {
+            authCheckAttempts++;
+            console.log(`Auth check attempt ${authCheckAttempts}/${maxAuthAttempts}`);
+            setTimeout(checkAuth, 2000); // Retry after 2 seconds
+            return;
+          }
           if (mounted) {
             router.push('/login');
           }
           return;
         }
 
-        // If no session, check if user exists
-        if (!session) {
-          const { data: { user }, error } = await supabase.auth.getUser();
-          if (error) {
-            console.error('Auth error:', error);
-            if (mounted) {
-              router.push('/login');
+        // If we have a valid session, use it
+        if (session?.user) {
+          console.log('Valid session found for user:', session.user.email);
+          
+          // Check if user is paused
+          try {
+            const { data: userStatus, error: statusError } = await supabase
+              .from('user_status')
+              .select('is_paused')
+              .eq('user_id', session.user.id)
+              .single();
+            
+            if (statusError && statusError.code !== 'PGRST116') {
+              console.error('User status check error:', statusError);
             }
-            return;
+            
+            if (userStatus?.is_paused) {
+              // User is paused, redirect to login with message
+              await supabase.auth.signOut();
+              if (mounted) {
+                router.push('/login?message=account_paused');
+              }
+              return;
+            }
+          } catch (statusError) {
+            console.error('Error checking user status:', statusError);
+            // Don't logout on status check errors, continue with session
           }
           
-          if (!user) {
-            if (mounted) {
-              router.push('/login');
-            }
-            return;
+          if (mounted) {
+            setUser(session.user);
+            setIsAuthenticated(true);
+            setIsLoadingAuth(false);
           }
+          return;
         }
 
-        const currentUser = session?.user || (await supabase.auth.getUser()).data.user;
+        // If no session, try to get user (for cases where session is stored but not current)
+        const { data: { user }, error } = await supabase.auth.getUser();
         
-        if (!currentUser) {
+        if (error) {
+          console.error('Auth error:', error);
+          if (authCheckAttempts < maxAuthAttempts) {
+            authCheckAttempts++;
+            console.log(`Auth check attempt ${authCheckAttempts}/${maxAuthAttempts}`);
+            setTimeout(checkAuth, 2000); // Retry after 2 seconds
+            return;
+          }
           if (mounted) {
             router.push('/login');
           }
           return;
         }
         
-        // Check if user is paused
-        const { data: userStatus, error: statusError } = await supabase
-          .from('user_status')
-          .select('is_paused')
-          .eq('user_id', currentUser.id)
-          .single();
-        
-        if (statusError && statusError.code !== 'PGRST116') {
-          // PGRST116 is "not found" error, which is fine for new users
-          console.error('User status check error:', statusError);
-        }
-        
-        if (userStatus?.is_paused) {
-          // User is paused, redirect to login with message
-          await supabase.auth.signOut();
+        if (user) {
+          console.log('User found:', user.email);
+          
+          // Check if user is paused
+          try {
+            const { data: userStatus, error: statusError } = await supabase
+              .from('user_status')
+              .select('is_paused')
+              .eq('user_id', user.id)
+              .single();
+            
+            if (statusError && statusError.code !== 'PGRST116') {
+              console.error('User status check error:', statusError);
+            }
+            
+            if (userStatus?.is_paused) {
+              await supabase.auth.signOut();
+              if (mounted) {
+                router.push('/login?message=account_paused');
+              }
+              return;
+            }
+          } catch (statusError) {
+            console.error('Error checking user status:', statusError);
+          }
+          
           if (mounted) {
-            router.push('/login?message=account_paused');
+            setUser(user);
+            setIsAuthenticated(true);
+            setIsLoadingAuth(false);
           }
           return;
         }
-        
+
+        // No user found, redirect to login
+        console.log('No authenticated user found');
         if (mounted) {
-          console.log('User authenticated successfully:', currentUser.email);
-          setUser(currentUser);
-          setIsAuthenticated(true);
+          router.push('/login');
         }
+        
       } catch (error) {
         console.error('Auth check failed:', error);
+        if (authCheckAttempts < maxAuthAttempts) {
+          authCheckAttempts++;
+          console.log(`Auth check attempt ${authCheckAttempts}/${maxAuthAttempts}`);
+          setTimeout(checkAuth, 2000); // Retry after 2 seconds
+          return;
+        }
         if (mounted) {
           router.push('/login');
         }
@@ -135,36 +192,45 @@ export default function Home() {
       }
     };
 
-    // Small delay to prevent rapid auth checks
+    // Initial auth check with a small delay
     const timer = setTimeout(() => {
       checkAuth();
     }, 100);
 
-    // Listen for auth changes
+    // Listen for auth changes with improved handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
 
+        console.log('Auth state change:', event, session?.user?.email);
+
         if (event === 'SIGNED_OUT') {
+          console.log('User signed out');
           setUser(null);
           setIsAuthenticated(false);
           router.push('/login');
         } else if (event === 'SIGNED_IN' && session?.user) {
+          console.log('User signed in:', session.user.email);
+          
           // Check if user is paused on sign in
-          const { data: userStatus, error: statusError } = await supabase
-            .from('user_status')
-            .select('is_paused')
-            .eq('user_id', session.user.id)
-            .single();
-          
-          if (statusError && statusError.code !== 'PGRST116') {
-            console.error('User status check error:', statusError);
-          }
-          
-          if (userStatus?.is_paused) {
-            await supabase.auth.signOut();
-            router.push('/login?message=account_paused');
-            return;
+          try {
+            const { data: userStatus, error: statusError } = await supabase
+              .from('user_status')
+              .select('is_paused')
+              .eq('user_id', session.user.id)
+              .single();
+            
+            if (statusError && statusError.code !== 'PGRST116') {
+              console.error('User status check error:', statusError);
+            }
+            
+            if (userStatus?.is_paused) {
+              await supabase.auth.signOut();
+              router.push('/login?message=account_paused');
+              return;
+            }
+          } catch (statusError) {
+            console.error('Error checking user status on sign in:', statusError);
           }
           
           setUser(session.user);
@@ -174,16 +240,36 @@ export default function Home() {
           console.log('Token refreshed for user:', session.user.email);
           setUser(session.user);
           setIsAuthenticated(true);
+        } else if (event === 'USER_UPDATED' && session?.user) {
+          // Handle user updates
+          console.log('User updated:', session.user.email);
+          setUser(session.user);
+          setIsAuthenticated(true);
         }
       }
     );
 
+    // Set up periodic session refresh to prevent timeouts
+    const sessionRefreshInterval = setInterval(async () => {
+      if (mounted && isAuthenticated && user) {
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (!error && session) {
+            console.log('Session refresh check - session valid');
+          }
+        } catch (error) {
+          console.error('Session refresh check failed:', error);
+        }
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+
     return () => {
       mounted = false;
       clearTimeout(timer);
+      clearInterval(sessionRefreshInterval);
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, isAuthenticated, user]);
 
   // Calculate email notification dates
   const getEmailSchedule = (installationDate: string) => {
