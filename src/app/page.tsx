@@ -799,8 +799,12 @@ export default function Home() {
       searchTerm,
       customersWithStatus: customers.map(c => ({ name: c.name, status: c.status }))
     });
-    filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
-  }, [customers, searchTerm, filterBy, sortBy, sortOrder, locationFilter]);
+    // Only filter when customers array changes, not when search/filter state changes
+    // as those are handled by their respective change handlers
+    if (customers.length > 0) {
+      filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
+    }
+  }, [customers]);
 
   // Show loading while checking authentication
   if (isLoadingAuth) {
