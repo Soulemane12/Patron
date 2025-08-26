@@ -54,60 +54,112 @@ export default function Home() {
 
   // Check authentication status
   useEffect(() => {
+    let mounted = true;
+
     const checkAuth = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) {
-          console.error('Auth error:', error);
-          router.push('/login');
+        // Get current session first
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          if (mounted) {
+            router.push('/login');
+          }
           return;
         }
+
+        // If no session, check if user exists
+        if (!session) {
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (error) {
+            console.error('Auth error:', error);
+            if (mounted) {
+              router.push('/login');
+            }
+            return;
+          }
+          
+          if (!user) {
+            if (mounted) {
+              router.push('/login');
+            }
+            return;
+          }
+        }
+
+        const currentUser = session?.user || (await supabase.auth.getUser()).data.user;
         
-        if (!user) {
-          router.push('/login');
+        if (!currentUser) {
+          if (mounted) {
+            router.push('/login');
+          }
           return;
         }
         
         // Check if user is paused
-        const { data: userStatus } = await supabase
+        const { data: userStatus, error: statusError } = await supabase
           .from('user_status')
           .select('is_paused')
-          .eq('user_id', user.id)
+          .eq('user_id', currentUser.id)
           .single();
+        
+        if (statusError && statusError.code !== 'PGRST116') {
+          // PGRST116 is "not found" error, which is fine for new users
+          console.error('User status check error:', statusError);
+        }
         
         if (userStatus?.is_paused) {
           // User is paused, redirect to login with message
           await supabase.auth.signOut();
-          router.push('/login?message=account_paused');
+          if (mounted) {
+            router.push('/login?message=account_paused');
+          }
           return;
         }
         
-        setUser(user);
-        setIsAuthenticated(true);
+        if (mounted) {
+          console.log('User authenticated successfully:', currentUser.email);
+          setUser(currentUser);
+          setIsAuthenticated(true);
+        }
       } catch (error) {
         console.error('Auth check failed:', error);
-        router.push('/login');
+        if (mounted) {
+          router.push('/login');
+        }
       } finally {
-        setIsLoadingAuth(false);
+        if (mounted) {
+          setIsLoadingAuth(false);
+        }
       }
     };
 
-    checkAuth();
+    // Small delay to prevent rapid auth checks
+    const timer = setTimeout(() => {
+      checkAuth();
+    }, 100);
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+
         if (event === 'SIGNED_OUT') {
           setUser(null);
           setIsAuthenticated(false);
           router.push('/login');
         } else if (event === 'SIGNED_IN' && session?.user) {
           // Check if user is paused on sign in
-          const { data: userStatus } = await supabase
+          const { data: userStatus, error: statusError } = await supabase
             .from('user_status')
             .select('is_paused')
             .eq('user_id', session.user.id)
             .single();
+          
+          if (statusError && statusError.code !== 'PGRST116') {
+            console.error('User status check error:', statusError);
+          }
           
           if (userStatus?.is_paused) {
             await supabase.auth.signOut();
@@ -117,11 +169,20 @@ export default function Home() {
           
           setUser(session.user);
           setIsAuthenticated(true);
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          // Handle token refresh to maintain session
+          console.log('Token refreshed for user:', session.user.email);
+          setUser(session.user);
+          setIsAuthenticated(true);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   // Calculate email notification dates
@@ -544,7 +605,7 @@ export default function Home() {
   }
 
   // Show login redirect if not authenticated
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isLoadingAuth) {
     return null; // Router will handle redirect
   }
 
@@ -558,14 +619,6 @@ export default function Home() {
           <p className="text-sm md:text-base text-gray-600">Your door-to-door sales assistant</p>
           <div className="flex items-center justify-center gap-4 mt-2">
             <span className="text-xs text-gray-500">Logged in as: {user?.email}</span>
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-              }}
-              className="text-xs text-red-600 hover:text-red-800 underline"
-            >
-              Sign Out
-            </button>
           </div>
         </div>
         
