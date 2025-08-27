@@ -79,30 +79,34 @@ export default function Home() {
     let mounted = true;
     let authCheckAttempts = 0;
     const maxAuthAttempts = 3;
+    let retryTimeout: NodeJS.Timeout | null = null;
 
     const checkAuth = async () => {
       try {
         console.log('Checking authentication...');
-        
+
         // Get current session first
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) {
           console.error('Session error:', sessionError);
-          // Don't immediately logout on session errors, try to refresh
-          if (authCheckAttempts < maxAuthAttempts) {
+
+          // Only retry for network errors, not for auth errors
+          if (authCheckAttempts < maxAuthAttempts && !sessionError.message?.includes('Invalid JWT')) {
             authCheckAttempts++;
             console.log(`Auth check attempt ${authCheckAttempts}/${maxAuthAttempts}`);
-            setTimeout(checkAuth, 2000); // Retry after 2 seconds
+            if (mounted) {
+              retryTimeout = setTimeout(checkAuth, 2000); // Retry after 2 seconds
+            }
             return;
           }
-          // Only logout if we've exhausted all retry attempts and it's a critical error
-          if (mounted && sessionError.message?.includes('Invalid JWT')) {
+
+          // For critical auth errors, redirect immediately
+          if (mounted && (sessionError.message?.includes('Invalid JWT') || sessionError.message?.includes('expired'))) {
             console.log('Critical auth error, redirecting to login');
             router.push('/login');
           } else {
             console.log('Non-critical auth error, continuing with current session');
-            // Don't logout, just continue with current state
           }
           return;
         }
@@ -110,7 +114,7 @@ export default function Home() {
         // If we have a valid session, use it
         if (session?.user) {
           console.log('Valid session found for user:', session.user.email);
-          
+
           // Check if user is paused
           try {
             const { data: userStatus, error: statusError } = await supabase
@@ -118,11 +122,11 @@ export default function Home() {
               .select('is_paused')
               .eq('user_id', session.user.id)
               .single();
-            
+
             if (statusError && statusError.code !== 'PGRST116') {
               console.error('User status check error:', statusError);
             }
-            
+
             if (userStatus?.is_paused) {
               // User is paused, redirect to login with message
               await supabase.auth.signOut();
@@ -135,7 +139,7 @@ export default function Home() {
             console.error('Error checking user status:', statusError);
             // Don't logout on status check errors, continue with session
           }
-          
+
           if (mounted) {
             setUser(session.user);
             setIsAuthenticated(true);
@@ -146,29 +150,33 @@ export default function Home() {
 
         // If no session, try to get user (for cases where session is stored but not current)
         const { data: { user }, error } = await supabase.auth.getUser();
-        
+
         if (error) {
           console.error('Auth error:', error);
-          if (authCheckAttempts < maxAuthAttempts) {
+
+          // Only retry for network errors, not for auth errors
+          if (authCheckAttempts < maxAuthAttempts && !error.message?.includes('Invalid JWT')) {
             authCheckAttempts++;
             console.log(`Auth check attempt ${authCheckAttempts}/${maxAuthAttempts}`);
-            setTimeout(checkAuth, 2000); // Retry after 2 seconds
+            if (mounted) {
+              retryTimeout = setTimeout(checkAuth, 2000); // Retry after 2 seconds
+            }
             return;
           }
-          // Only logout on critical errors
-          if (mounted && error.message?.includes('Invalid JWT')) {
+
+          // For critical auth errors, redirect immediately
+          if (mounted && (error.message?.includes('Invalid JWT') || error.message?.includes('expired'))) {
             console.log('Critical auth error, redirecting to login');
             router.push('/login');
           } else {
             console.log('Non-critical auth error, continuing with current session');
-            // Don't logout, just continue with current state
           }
           return;
         }
-        
+
         if (user) {
           console.log('User found:', user.email);
-          
+
           // Check if user is paused
           try {
             const { data: userStatus, error: statusError } = await supabase
@@ -176,11 +184,11 @@ export default function Home() {
               .select('is_paused')
               .eq('user_id', user.id)
               .single();
-            
+
             if (statusError && statusError.code !== 'PGRST116') {
               console.error('User status check error:', statusError);
             }
-            
+
             if (userStatus?.is_paused) {
               await supabase.auth.signOut();
               if (mounted) {
@@ -191,7 +199,7 @@ export default function Home() {
           } catch (statusError) {
             console.error('Error checking user status:', statusError);
           }
-          
+
           if (mounted) {
             setUser(user);
             setIsAuthenticated(true);
@@ -205,15 +213,18 @@ export default function Home() {
         if (mounted) {
           router.push('/login');
         }
-        
+
       } catch (error) {
         console.error('Auth check failed:', error);
-        if (authCheckAttempts < maxAuthAttempts) {
+
+        // Only retry for network errors
+        if (authCheckAttempts < maxAuthAttempts && mounted) {
           authCheckAttempts++;
           console.log(`Auth check attempt ${authCheckAttempts}/${maxAuthAttempts}`);
-          setTimeout(checkAuth, 2000); // Retry after 2 seconds
+          retryTimeout = setTimeout(checkAuth, 2000); // Retry after 2 seconds
           return;
         }
+
         if (mounted) {
           router.push('/login');
         }
@@ -328,6 +339,9 @@ export default function Home() {
     return () => {
       mounted = false;
       clearTimeout(timer);
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
       clearInterval(sessionRefreshInterval);
       subscription.unsubscribe();
     };
@@ -368,9 +382,7 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.details || 'Failed to format customer information';
-        throw new Error(errorMessage);
+        throw new Error('Failed to format customer information');
       }
 
       const data = await response.json();
@@ -382,24 +394,7 @@ export default function Home() {
       });
       setShowCopied(false);
     } catch (err) {
-      console.error('Format customer error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
-
-      // If it's an API key error, offer manual entry as fallback
-      if (err instanceof Error && err.message.includes('GROQ_API_KEY')) {
-        setError(`${err.message}. You can still add customers manually by filling out the form below.`);
-        // Create empty formatted info for manual entry
-        setFormattedInfo({
-          name: '',
-          email: '',
-          phone: '',
-          serviceAddress: '',
-          installationDate: '',
-          installationTime: '',
-          isReferral: false,
-          referralSource: ''
-        });
-      }
     } finally {
       setIsLoading(false);
     }
@@ -417,14 +412,21 @@ export default function Home() {
 
     setIsSaving(true);
     setError(''); // Clear any previous errors
-    
+
+    // Add timeout to prevent hanging
+    const saveTimeout = setTimeout(() => {
+      setError('Save operation timed out. Please try again.');
+      setIsSaving(false);
+    }, 30000); // 30 second timeout
+
     try {
       console.log('Saving customer...');
-      
+
       // Determine status - if leadSize indicates paid, set to completed
       let status = 'active'; // Default status for new customers
-      
-      const { data, error } = await supabase
+
+      // Create a promise that can be aborted
+      const savePromise = supabase
         .from('customers')
         .insert([
           {
@@ -443,6 +445,14 @@ export default function Home() {
         ])
         .select();
 
+      // Add timeout to the save operation
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Save operation timed out')), 25000);
+      });
+
+      const result = await Promise.race([savePromise, timeoutPromise]);
+      const { data, error } = result;
+
       if (error) {
         console.error('Supabase error:', error);
         throw new Error(`Failed to save customer: ${error.message}`);
@@ -456,23 +466,32 @@ export default function Home() {
 
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 3000);
-      
+
       // Clear the form first
       clearForm();
-      
+
       // Add a small delay to ensure the database operation is complete
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Reload customers with the new data
       await loadCustomers();
-      
+
       // Switch to customers view after saving
       setActiveSection('pipeline');
-      
+
     } catch (error) {
       console.error('Error saving customer:', error);
-      setError(error instanceof Error ? error.message : 'Failed to save customer');
+      if (error instanceof Error) {
+        if (error.message.includes('timed out')) {
+          setError('Save operation timed out. Please check your connection and try again.');
+        } else {
+          setError(error.message);
+        }
+      } else {
+        setError('Failed to save customer');
+      }
     } finally {
+      clearTimeout(saveTimeout);
       setIsSaving(false);
     }
   };
@@ -499,8 +518,8 @@ export default function Home() {
   };
 
   const loadCustomers = async () => {
-    if (!user) {
-      console.log('No user available, skipping loadCustomers');
+    if (!user || !isAuthenticated) {
+      console.log('No user available or not authenticated, skipping loadCustomers');
       return;
     }
     
@@ -1314,12 +1333,7 @@ export default function Home() {
         {activeSection === 'add' && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8 border-t-4 border-green-500">
             <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4 text-blue-800">Add New Sales Lead</h2>
-            <p className="text-xs md:text-sm text-black mb-3 md:mb-4">
-              Paste your customer's information from your notes in any format - our AI will organize it automatically.
-              <span className="text-blue-600 block mt-1">
-                💡 Tip: Use "Manual Entry" button to add customers manually if AI processing fails.
-              </span>
-            </p>
+            <p className="text-xs md:text-sm text-black mb-3 md:mb-4">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
@@ -1339,25 +1353,6 @@ export default function Home() {
                 </svg>
                 Process Lead
               </span>
-                </button>
-                <button
-              onClick={() => {
-                setFormattedInfo({
-                  name: '',
-                  email: '',
-                  phone: '',
-                  serviceAddress: '',
-                  installationDate: '',
-                  installationTime: '',
-                  isReferral: false,
-                  referralSource: ''
-                });
-                setError('');
-                setInputText('');
-              }}
-              className="px-4 md:px-6 py-2 bg-blue-500 text-white text-xs md:text-sm rounded-lg hover:bg-blue-600"
-                >
-                  Manual Entry
                 </button>
                 <button
               onClick={clearForm}
