@@ -368,7 +368,9 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to format customer information');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.details || 'Failed to format customer information';
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -380,7 +382,24 @@ export default function Home() {
       });
       setShowCopied(false);
     } catch (err) {
+      console.error('Format customer error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
+
+      // If it's an API key error, offer manual entry as fallback
+      if (err instanceof Error && err.message.includes('GROQ_API_KEY')) {
+        setError(`${err.message}. You can still add customers manually by filling out the form below.`);
+        // Create empty formatted info for manual entry
+        setFormattedInfo({
+          name: '',
+          email: '',
+          phone: '',
+          serviceAddress: '',
+          installationDate: '',
+          installationTime: '',
+          isReferral: false,
+          referralSource: ''
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1295,7 +1314,12 @@ export default function Home() {
         {activeSection === 'add' && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8 border-t-4 border-green-500">
             <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4 text-blue-800">Add New Sales Lead</h2>
-            <p className="text-xs md:text-sm text-black mb-3 md:mb-4">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
+            <p className="text-xs md:text-sm text-black mb-3 md:mb-4">
+              Paste your customer's information from your notes in any format - our AI will organize it automatically.
+              <span className="text-blue-600 block mt-1">
+                💡 Tip: Use "Manual Entry" button to add customers manually if AI processing fails.
+              </span>
+            </p>
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
@@ -1315,6 +1339,25 @@ export default function Home() {
                 </svg>
                 Process Lead
               </span>
+                </button>
+                <button
+              onClick={() => {
+                setFormattedInfo({
+                  name: '',
+                  email: '',
+                  phone: '',
+                  serviceAddress: '',
+                  installationDate: '',
+                  installationTime: '',
+                  isReferral: false,
+                  referralSource: ''
+                });
+                setError('');
+                setInputText('');
+              }}
+              className="px-4 md:px-6 py-2 bg-blue-500 text-white text-xs md:text-sm rounded-lg hover:bg-blue-600"
+                >
+                  Manual Entry
                 </button>
                 <button
               onClick={clearForm}
