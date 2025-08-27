@@ -49,6 +49,15 @@ export default function AdminPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Check authentication on component mount
+  useEffect(() => {
+    const authStatus = localStorage.getItem('adminAuthenticated');
+    if (authStatus === 'true') {
+      setIsAuthenticated(true);
+      loadAllData();
+    }
+  }, []);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [customers, setCustomers] = useState<AdminCustomer[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -71,16 +80,32 @@ export default function AdminPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [justAddedLead, setJustAddedLead] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === 'soulemane') {
       setIsAuthenticated(true);
       setError('');
+      localStorage.setItem('adminAuthenticated', 'true');
       loadAllData();
     } else {
       setError('Incorrect password');
     }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setPassword('');
+    setError('');
+    setUsers([]);
+    setCustomers([]);
+    setSelectedUser(null);
+    setUserCustomers([]);
+    setShowAddLeadForm(false);
+    setEditingCustomer(null);
+    setJustAddedLead(false);
+    localStorage.removeItem('adminAuthenticated');
   };
 
   const loadAllData = async () => {
@@ -188,6 +213,7 @@ export default function AdminPage() {
         lead_size: '2GIG'
       });
       setShowAddLeadForm(false);
+      setJustAddedLead(true);
       loadAllData();
       alert('Customer added successfully!');
     } catch (error) {
@@ -245,6 +271,7 @@ export default function AdminPage() {
 
       loadAllData();
       alert('Customer deleted successfully!');
+      setJustAddedLead(false); // Reset the just added state
     } catch (error) {
       console.error('Error deleting customer:', error);
       alert('Failed to delete customer');
@@ -292,8 +319,18 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-2xl font-bold text-blue-800 mb-4">Admin Dashboard</h1>
-          <p className="text-gray-600 mb-4">View all users and their customer data</p>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-blue-800">Admin Dashboard</h1>
+              <p className="text-gray-600">View all users and their customer data</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
           
           {loading ? (
             <div className="flex justify-center py-8">
@@ -334,15 +371,21 @@ export default function AdminPage() {
               {/* Admin Actions */}
               <div className="flex gap-4 mb-6">
                 <button
-                  onClick={() => setShowAddLeadForm(!showAddLeadForm)}
+                  onClick={() => {
+                    if (justAddedLead) {
+                      setJustAddedLead(false);
+                    }
+                    setShowAddLeadForm(!showAddLeadForm);
+                  }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  {showAddLeadForm ? 'Cancel Add Lead' : 'Add New Lead'}
+                  {showAddLeadForm ? 'Cancel Add Lead' : justAddedLead ? 'Add Another Lead' : 'Add New Lead'}
                 </button>
                 <button
                   onClick={() => {
                     setShowAddLeadForm(false);
                     setEditingCustomer(null);
+                    setJustAddedLead(false);
                   }}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
