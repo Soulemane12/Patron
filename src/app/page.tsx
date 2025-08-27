@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import LoadingSpinner from './components/LoadingSpinner';
 import { supabase, Customer } from '../lib/supabase';
@@ -53,6 +53,7 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Track user activity to prevent automatic logouts
   useEffect(() => {
@@ -511,7 +512,7 @@ export default function Home() {
       
       // Update both states
       setCustomers(loadedCustomers);
-      setFilteredCustomers(loadedCustomers);
+      // Don't set filteredCustomers here - it will be handled by the debounced search effect
       
     } catch (error) {
       console.error('Error loading customers:', error);
@@ -627,7 +628,7 @@ export default function Home() {
   };
 
   // Filter and sort customers based on search term, filter, and sort options
-  const filterAndSortCustomers = (term: string, filter: string, sort: string, order: 'asc' | 'desc', location: string = 'all') => {
+  const filterAndSortCustomers = useCallback((term: string, filter: string, sort: string, order: 'asc' | 'desc', location: string = 'all') => {
     let filtered = [...customers];
     
     // Apply search filter
@@ -747,14 +748,30 @@ export default function Home() {
       filteredCustomers: filtered.map(c => ({ name: c.name, status: c.status }))
     });
     setFilteredCustomers(filtered);
-  };
+  }, [customers]);
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const term = e.target.value;
     setSearchTerm(term);
-    filterAndSortCustomers(term, filterBy, sortBy, sortOrder, locationFilter);
   };
+
+  // Debounced search effect
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm, filterAndSortCustomers, filterBy, sortBy, sortOrder, locationFilter]);
 
   // Handle sort change
   const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -790,21 +807,22 @@ export default function Home() {
       loadCustomers();
     }
   }, [isAuthenticated, user]);
-  
-  // Update filtered customers when customers change
+
+  // Initial filtering when customers are loaded
   useEffect(() => {
-    console.log('Filtering customers:', {
-      totalCustomers: customers.length,
-      filterBy,
-      searchTerm,
-      customersWithStatus: customers.map(c => ({ name: c.name, status: c.status }))
-    });
-    // Only filter when customers array changes, not when search/filter state changes
-    // as those are handled by their respective change handlers
     if (customers.length > 0) {
+      console.log('Initial filtering of customers:', {
+        totalCustomers: customers.length,
+        filterBy,
+        searchTerm,
+        customersWithStatus: customers.map(c => ({ name: c.name, status: c.status }))
+      });
       filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
+    } else {
+      // If no customers, set filtered to empty array
+      setFilteredCustomers([]);
     }
-  }, [customers]);
+  }, [customers, filterAndSortCustomers]);
 
   // Show loading while checking authentication
   if (isLoadingAuth) {
