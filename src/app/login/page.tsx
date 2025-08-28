@@ -165,83 +165,9 @@ export default function LoginPage() {
       if (data?.session && data?.user) {
         console.log('Login successful! User:', data.user.email);
         
-        // Force a complete session refresh to ensure it's properly stored
-        try {
-          await supabase.auth.getSession();
-          console.log('Session refreshed successfully');
-        } catch (refreshError) {
-          console.warn('Session refresh failed:', refreshError);
-        }
-        
-        // Force session to be immediately available for main page
-        try {
-          // Trigger auth state change listeners
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            console.log('Verified session is available for handoff');
-          }
-        } catch (e) {
-          console.warn('Session verification failed:', e);
-        }
-        
-        // Enhanced cross-browser session persistence and redirect
-        const isSafariMobile = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
-        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        console.log(`Browser detection: Safari Mobile: ${isSafariMobile}, iOS: ${isIOS}, Mobile: ${isMobile}`);
-        
-        // Enhanced session storage for all browsers
-        try {
-          // Store in multiple places for maximum compatibility
-          const timestamp = Date.now().toString();
-          localStorage.setItem('patron-login-success', timestamp);
-          sessionStorage.setItem('patron-session-active', timestamp);
-          localStorage.setItem('patron-user-email', data.user.email);
-          localStorage.setItem('patron-user-id', data.user.id);
-          
-          // Enhanced cookie storage for all mobile browsers
-          const yearFromNow = new Date();
-          yearFromNow.setFullYear(yearFromNow.getFullYear() + 1);
-          
-          if (location.protocol === 'https:') {
-            document.cookie = `patron-login-token=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
-            document.cookie = `patron-login-timestamp=${timestamp}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
-            if (isSafariMobile || isIOS) {
-              document.cookie = `patron-safari-session=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
-            }
-          } else {
-            document.cookie = `patron-login-token=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
-            document.cookie = `patron-login-timestamp=${timestamp}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
-            if (isSafariMobile || isIOS) {
-              document.cookie = `patron-safari-session=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
-            }
-          }
-          console.log('Enhanced session storage completed with timestamp:', timestamp);
-        } catch (e) {
-          console.warn('Could not set enhanced session storage:', e);
-        }
-        
-        // Wait for session to fully process before redirect
-        let redirectDelay = 800; // Default
-        if (isSafariMobile) {
-          redirectDelay = 1200; // Extra time for Safari mobile
-        } else if (isIOS || isMobile) {
-          redirectDelay = 1000; // Extra time for mobile devices
-        }
-        
-        console.log(`Using ${redirectDelay}ms redirect delay for this browser`);
-        
-        setTimeout(() => {
-          console.log('Redirecting to dashboard with enhanced session...');
-          // Use the most reliable redirect method
-          try {
-            window.location.replace('/');
-          } catch (e) {
-            console.warn('Replace failed, trying href:', e);
-            window.location.href = '/';
-          }
-        }, redirectDelay);
+        // Immediate redirect - the auth state listener will handle the session
+        console.log('Login successful, redirecting immediately...');
+        window.location.href = '/';
         
       } else {
         console.error('Login succeeded but no session/user found');

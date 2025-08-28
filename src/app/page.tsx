@@ -111,6 +111,27 @@ export default function Home() {
     };
 
     window.addEventListener('storage', handleStorageChange);
+
+    // Use Supabase's auth state listener for immediate auth detection
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
+      
+      if (event === 'SIGNED_IN' && session && mounted) {
+        console.log('User signed in via auth state listener');
+        setUser(session.user);
+        setIsAuthenticated(true);
+        setIsLoadingAuth(false);
+        return;
+      }
+      
+      if (event === 'SIGNED_OUT' && mounted) {
+        console.log('User signed out via auth state listener');
+        setUser(null);
+        setIsAuthenticated(false);
+        setIsLoadingAuth(false);
+        return;
+      }
+    });
     
     // Add shorter timeout to prevent infinite loading on mobile
     const loadingTimeout = setTimeout(() => {
@@ -150,72 +171,21 @@ export default function Home() {
               }
             }
             
-            // Check for recent login indicators
-            const loginTimestamp = localStorage.getItem('patron-login-success') || 
-                                 sessionStorage.getItem('patron-session-active');
-            const hasLoginToken = document.cookie.includes('patron-login-token');
-            const hasTimestampCookie = document.cookie.includes('patron-login-timestamp');
-            const userEmail = localStorage.getItem('patron-user-email');
-            const userId = localStorage.getItem('patron-user-id');
+            // Just try a simple session refresh - no localStorage needed
+            console.log('Attempting simple session refresh...');
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Brief wait
             
-            const hasLoginIndicators = loginTimestamp || hasLoginToken || hasTimestampCookie;
-            
-            if (hasLoginIndicators) {
-              console.log('Found fresh login indicators, attempting enhanced session recovery...');
-              console.log('Login timestamp:', loginTimestamp, 'User email:', userEmail);
-              
-              // Check how recent the login was (within last 30 seconds)
-              const isRecentLogin = loginTimestamp && (Date.now() - parseInt(loginTimestamp)) < 30000;
-              
-              if (isRecentLogin) {
-                console.log('Very recent login detected, trying multiple recovery attempts...');
-                
-                // Try immediate session check first
-                try {
-                  const { data: immediateSessionData, error: immediateError } = await supabase.auth.getSession();
-                  if (!immediateError && immediateSessionData.session) {
-                    console.log('Immediate session recovery successful!');
-                    setUser(immediateSessionData.session.user);
-                    setIsAuthenticated(true);
-                    setIsLoadingAuth(false);
-                    // Clear indicators after successful recovery
-                    localStorage.removeItem('patron-login-success');
-                    sessionStorage.removeItem('patron-session-active');
-                    return;
-                  }
-                } catch (e) {
-                  console.warn('Immediate session recovery failed:', e);
-                }
-                
-                // If immediate didn't work, wait and try again
-                console.log('Waiting 3 seconds for session to fully establish...');
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                
-                try {
-                  const { data: delayedSessionData, error: delayedError } = await supabase.auth.getSession();
-                  if (!delayedError && delayedSessionData.session) {
-                    console.log('Delayed session recovery successful!');
-                    setUser(delayedSessionData.session.user);
-                    setIsAuthenticated(true);
-                    setIsLoadingAuth(false);
-                    // Clear indicators after successful recovery
-                    localStorage.removeItem('patron-login-success');
-                    sessionStorage.removeItem('patron-session-active');
-                    return;
-                  }
-                } catch (e) {
-                  console.warn('Delayed session recovery failed:', e);
-                }
+            try {
+              const { data: refreshedSessionData, error: refreshError } = await supabase.auth.getSession();
+              if (!refreshError && refreshedSessionData.session) {
+                console.log('Session refresh successful!');
+                setUser(refreshedSessionData.session.user);
+                setIsAuthenticated(true);
+                setIsLoadingAuth(false);
+                return;
               }
-              
-              // Clear old indicators if not recent
-              if (!isRecentLogin) {
-                console.log('Login indicators are old, clearing them');
-                localStorage.removeItem('patron-login-success');
-                sessionStorage.removeItem('patron-session-active');
-                localStorage.removeItem('patron-user-email');
-                localStorage.removeItem('patron-user-id');
-              }
+            } catch (e) {
+              console.warn('Session refresh failed:', e);
             }
             
             // Try one more time to get the session with a fresh attempt
@@ -230,21 +200,6 @@ export default function Home() {
               }
             } catch (e) {
               console.warn('Fresh session attempt failed:', e);
-            }
-            
-            // Final check - if we have very recent login indicators but no session, 
-            // something went wrong in the handoff - force a page refresh to retry
-            const finalLoginCheck = localStorage.getItem('patron-login-success');
-            const isFinalRecentLogin = finalLoginCheck && (Date.now() - parseInt(finalLoginCheck)) < 10000; // 10 seconds
-            
-            if (isFinalRecentLogin) {
-              console.log('Recent login detected but no session found, forcing page refresh to retry session recovery...');
-              // Remove the indicator to prevent infinite loops
-              localStorage.removeItem('patron-login-success');
-              sessionStorage.removeItem('patron-session-active');
-              // Force a hard refresh to reload everything
-              window.location.reload();
-              return;
             }
             
             console.log('No valid session found, redirecting to login');
@@ -530,6 +485,7 @@ export default function Home() {
       }
       clearInterval(sessionRefreshInterval);
       subscription.unsubscribe();
+      authSubscription.unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [router, isAuthenticated, user, lastActivity]);
