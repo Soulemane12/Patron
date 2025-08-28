@@ -173,6 +173,17 @@ export default function LoginPage() {
           console.warn('Session refresh failed:', refreshError);
         }
         
+        // Force session to be immediately available for main page
+        try {
+          // Trigger auth state change listeners
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            console.log('Verified session is available for handoff');
+          }
+        } catch (e) {
+          console.warn('Session verification failed:', e);
+        }
+        
         // Enhanced cross-browser session persistence and redirect
         const isSafariMobile = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
         const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -183,8 +194,11 @@ export default function LoginPage() {
         // Enhanced session storage for all browsers
         try {
           // Store in multiple places for maximum compatibility
-          localStorage.setItem('patron-login-success', 'true');
-          sessionStorage.setItem('patron-session-active', 'true');
+          const timestamp = Date.now().toString();
+          localStorage.setItem('patron-login-success', timestamp);
+          sessionStorage.setItem('patron-session-active', timestamp);
+          localStorage.setItem('patron-user-email', data.user.email);
+          localStorage.setItem('patron-user-id', data.user.id);
           
           // Enhanced cookie storage for all mobile browsers
           const yearFromNow = new Date();
@@ -192,15 +206,18 @@ export default function LoginPage() {
           
           if (location.protocol === 'https:') {
             document.cookie = `patron-login-token=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
+            document.cookie = `patron-login-timestamp=${timestamp}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
             if (isSafariMobile || isIOS) {
               document.cookie = `patron-safari-session=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
             }
           } else {
             document.cookie = `patron-login-token=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
+            document.cookie = `patron-login-timestamp=${timestamp}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
             if (isSafariMobile || isIOS) {
               document.cookie = `patron-safari-session=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
             }
           }
+          console.log('Enhanced session storage completed with timestamp:', timestamp);
         } catch (e) {
           console.warn('Could not set enhanced session storage:', e);
         }

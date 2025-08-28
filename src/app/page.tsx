@@ -151,31 +151,70 @@ export default function Home() {
             }
             
             // Check for recent login indicators
-            const hasLoginIndicators = localStorage.getItem('patron-login-success') || 
-                                     sessionStorage.getItem('patron-session-active') ||
-                                     document.cookie.includes('patron-login-token');
+            const loginTimestamp = localStorage.getItem('patron-login-success') || 
+                                 sessionStorage.getItem('patron-session-active');
+            const hasLoginToken = document.cookie.includes('patron-login-token');
+            const hasTimestampCookie = document.cookie.includes('patron-login-timestamp');
+            const userEmail = localStorage.getItem('patron-user-email');
+            const userId = localStorage.getItem('patron-user-id');
+            
+            const hasLoginIndicators = loginTimestamp || hasLoginToken || hasTimestampCookie;
             
             if (hasLoginIndicators) {
-              console.log('Found login indicators, attempting enhanced session recovery...');
+              console.log('Found fresh login indicators, attempting enhanced session recovery...');
+              console.log('Login timestamp:', loginTimestamp, 'User email:', userEmail);
               
-              // Clear old indicators
-              localStorage.removeItem('patron-login-success');
-              sessionStorage.removeItem('patron-session-active');
+              // Check how recent the login was (within last 30 seconds)
+              const isRecentLogin = loginTimestamp && (Date.now() - parseInt(loginTimestamp)) < 30000;
               
-              // Give more time for session to be established
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              
-              try {
-                const { data: enhancedSessionData, error: enhancedError } = await supabase.auth.getSession();
-                if (!enhancedError && enhancedSessionData.session) {
-                  console.log('Enhanced session recovery successful!');
-                  setUser(enhancedSessionData.session.user);
-                  setIsAuthenticated(true);
-                  setIsLoadingAuth(false);
-                  return;
+              if (isRecentLogin) {
+                console.log('Very recent login detected, trying multiple recovery attempts...');
+                
+                // Try immediate session check first
+                try {
+                  const { data: immediateSessionData, error: immediateError } = await supabase.auth.getSession();
+                  if (!immediateError && immediateSessionData.session) {
+                    console.log('Immediate session recovery successful!');
+                    setUser(immediateSessionData.session.user);
+                    setIsAuthenticated(true);
+                    setIsLoadingAuth(false);
+                    // Clear indicators after successful recovery
+                    localStorage.removeItem('patron-login-success');
+                    sessionStorage.removeItem('patron-session-active');
+                    return;
+                  }
+                } catch (e) {
+                  console.warn('Immediate session recovery failed:', e);
                 }
-              } catch (e) {
-                console.warn('Enhanced session recovery failed:', e);
+                
+                // If immediate didn't work, wait and try again
+                console.log('Waiting 3 seconds for session to fully establish...');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                try {
+                  const { data: delayedSessionData, error: delayedError } = await supabase.auth.getSession();
+                  if (!delayedError && delayedSessionData.session) {
+                    console.log('Delayed session recovery successful!');
+                    setUser(delayedSessionData.session.user);
+                    setIsAuthenticated(true);
+                    setIsLoadingAuth(false);
+                    // Clear indicators after successful recovery
+                    localStorage.removeItem('patron-login-success');
+                    sessionStorage.removeItem('patron-session-active');
+                    return;
+                  }
+                } catch (e) {
+                  console.warn('Delayed session recovery failed:', e);
+                }
+              }
+              
+              // Clear old indicators if not recent
+              if (!isRecentLogin) {
+                console.log('Login indicators are old, clearing them');
+                localStorage.removeItem('patron-login-success');
+                sessionStorage.removeItem('patron-session-active');
+                localStorage.removeItem('patron-user-email');
+                localStorage.removeItem('patron-user-id');
               }
             }
             
@@ -191,6 +230,21 @@ export default function Home() {
               }
             } catch (e) {
               console.warn('Fresh session attempt failed:', e);
+            }
+            
+            // Final check - if we have very recent login indicators but no session, 
+            // something went wrong in the handoff - force a page refresh to retry
+            const finalLoginCheck = localStorage.getItem('patron-login-success');
+            const isFinalRecentLogin = finalLoginCheck && (Date.now() - parseInt(finalLoginCheck)) < 10000; // 10 seconds
+            
+            if (isFinalRecentLogin) {
+              console.log('Recent login detected but no session found, forcing page refresh to retry session recovery...');
+              // Remove the indicator to prevent infinite loops
+              localStorage.removeItem('patron-login-success');
+              sessionStorage.removeItem('patron-session-active');
+              // Force a hard refresh to reload everything
+              window.location.reload();
+              return;
             }
             
             console.log('No valid session found, redirecting to login');
