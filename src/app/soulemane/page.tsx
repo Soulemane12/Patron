@@ -79,6 +79,8 @@ export default function AdminPage() {
     referral_source: '',
     lead_size: '2GIG'
   });
+  const [customerInputText, setCustomerInputText] = useState('');
+  const [isFormattingCustomer, setIsFormattingCustomer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [justAddedLead, setJustAddedLead] = useState(false);
@@ -156,6 +158,18 @@ export default function AdminPage() {
   const handlePauseUser = async (userId: string, action: 'pause' | 'unpause') => {
     setPausingUser(userId);
     try {
+      // First check if user_status table exists
+      const checkResponse = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': 'Bearer soulemane'
+        }
+      });
+      
+      if (!checkResponse.ok) {
+        throw new Error('Failed to check user status');
+      }
+      
+      // Now attempt the pause/unpause
       const response = await fetch('/api/admin/users/pause', {
         method: 'POST',
         headers: {
@@ -166,16 +180,58 @@ export default function AdminPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to pause/unpause user');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to pause/unpause user');
       }
 
       // Reload data to reflect changes
       loadAllData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error pausing/unpausing user:', error);
-      alert('Failed to pause/unpause user');
+      alert(`Failed to ${action} user: ${error.message || 'Unknown error'}`);
     } finally {
       setPausingUser(null);
+    }
+  };
+
+  const formatCustomerInfo = async () => {
+    if (!customerInputText.trim()) {
+      alert('Please enter customer information');
+      return;
+    }
+
+    setIsFormattingCustomer(true);
+    try {
+      const response = await fetch('/api/format-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: customerInputText }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to format customer information');
+      }
+
+      const data = await response.json();
+      
+      // Update the form with formatted data
+      setNewCustomerData({
+        ...newCustomerData,
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        service_address: data.serviceAddress || '',
+        installation_date: data.installationDate || '',
+        installation_time: data.installationTime || ''
+      });
+      
+    } catch (error) {
+      console.error('Error formatting customer info:', error);
+      alert('Failed to format customer information. Please try again or enter details manually.');
+    } finally {
+      setIsFormattingCustomer(false);
     }
   };
 
@@ -215,6 +271,7 @@ export default function AdminPage() {
         referral_source: '',
         lead_size: '2GIG'
       });
+      setCustomerInputText('');
       setShowAddLeadForm(false);
       setJustAddedLead(true);
       loadAllData();
@@ -352,33 +409,11 @@ export default function AdminPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Overall Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                <div className="bg-blue-50 p-4 rounded-lg text-center">
+              {/* User count only */}
+              <div className="mb-6">
+                <div className="bg-blue-50 p-4 rounded-lg inline-block">
                   <p className="text-sm text-gray-600">Total Users</p>
                   <p className="text-2xl font-bold text-blue-700">{users.length}</p>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg text-center">
-                  <p className="text-sm text-gray-600">Total Customers</p>
-                  <p className="text-2xl font-bold text-green-700">{customers.length}</p>
-                </div>
-                <div className="bg-yellow-50 p-4 rounded-lg text-center">
-                  <p className="text-sm text-gray-600">Completed Customers</p>
-                  <p className="text-2xl font-bold text-yellow-700">
-                    {customers.filter(c => c.status === 'completed' || c.status === 'paid').length}
-                  </p>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg text-center">
-                  <p className="text-sm text-gray-600">Paid Customers</p>
-                  <p className="text-2xl font-bold text-purple-700">
-                    {customers.filter(c => c.status === 'paid').length}
-                  </p>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg text-center">
-                  <p className="text-sm text-gray-600">Cancelled</p>
-                  <p className="text-2xl font-bold text-red-700">
-                    {customers.filter(c => c.status === 'cancelled').length}
-                  </p>
                 </div>
               </div>
 
@@ -412,7 +447,7 @@ export default function AdminPage() {
                 <div className="bg-gray-50 p-6 rounded-lg mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Add New Lead</h3>
                   <form onSubmit={handleAddCustomer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
+                    <div className="md:col-span-2 lg:col-span-3">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Assign to User</label>
                       <select
                         value={newCustomerData.user_id}
@@ -428,6 +463,35 @@ export default function AdminPage() {
                         ))}
                       </select>
                     </div>
+                    
+                    <div className="md:col-span-2 lg:col-span-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Paste Customer Information</label>
+                      <textarea
+                        value={customerInputText}
+                        onChange={(e) => setCustomerInputText(e.target.value)}
+                        rows={4}
+                        placeholder="Example: John Smith, phone 555-123-4567, email john@example.com, address 123 Main St, installation scheduled for June 15th at 2pm..."
+                        className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500 resize-none"
+                      />
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={formatCustomerInfo}
+                          disabled={isFormattingCustomer || !customerInputText.trim()}
+                          className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {isFormattingCustomer ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Processing...
+                            </>
+                          ) : (
+                            <>Process Lead</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
                       <input
