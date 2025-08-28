@@ -16,30 +16,76 @@ export default function Navbar({ activeSection, onSectionChange }: NavbarProps) 
   async function handleSignOut() {
     try {
       setIsSigningOut(true);
+      console.log('Starting sign out process...');
       
-      // Perform a local signOut instead of global to maintain other devices' sessions
-      // This allows multiple people to share the same account
+      // Use global scope to properly sign out from all sessions
       await supabase.auth.signOut({ 
-        scope: 'local' // Important: Only sign out this device
+        scope: 'global' // Sign out from all devices/sessions to fix reload issue
       });
       
-      // Clear local storage for this device
-      localStorage.removeItem('patron-auth');
-      sessionStorage.removeItem('patron-auth');
+      // Clear all storage more thoroughly
+      try {
+        // Clear specific auth keys
+        localStorage.removeItem('patron-auth');
+        sessionStorage.removeItem('patron-auth');
+        
+        // Also clear any Supabase default keys
+        Object.keys(localStorage).forEach(key => {
+          if (key.includes('supabase') || key.includes('patron')) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.includes('supabase') || key.includes('patron')) {
+            sessionStorage.removeItem(key);
+          }
+        });
+      } catch (e) {
+        console.warn('Storage clear error:', e);
+      }
       
-      // Clear cookies for this device
-      document.cookie.split(';').forEach(c => {
-        if (c.trim().startsWith('patron-auth=') || c.trim().startsWith('patron-auth-exists=')) {
-          document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
-        }
+      // Clear all possible cookies more aggressively
+      const cookiesToClear = [
+        'patron-auth',
+        'patron-auth-exists', 
+        'patron-safari-session',
+        'supabase-auth-token',
+        'sb-auth-token'
+      ];
+
+      cookiesToClear.forEach(cookieName => {
+        // Clear with different combinations to ensure complete removal
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax;`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=None; Secure;`;
       });
       
-      // Force redirect to login page
-      window.location.href = '/login?fresh=true';
+      console.log('Sign out completed, notifying other tabs...');
+      
+      // Trigger storage event to notify other tabs/windows to sign out
+      try {
+        localStorage.setItem('patron-signout-event', Date.now().toString());
+        // Remove it immediately so it can be triggered again
+        setTimeout(() => localStorage.removeItem('patron-signout-event'), 100);
+      } catch (e) {
+        console.warn('Could not trigger cross-tab sign out:', e);
+      }
+      
+      // Use replace to prevent back navigation to authenticated state
+      window.location.replace('/login?fresh=true&signed_out=true');
+      
     } catch (error) {
       console.error('Sign out failed', error);
-      // Force redirect even on error
-      window.location.href = '/login?fresh=true';
+      
+      // Even if sign out fails, clear local data and redirect
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (e) {}
+      
+      window.location.replace('/login?fresh=true&signed_out=true');
     }
   }
 

@@ -80,6 +80,18 @@ export default function Home() {
     let authCheckAttempts = 0;
     const maxAuthAttempts = 3;
     let retryTimeout: NodeJS.Timeout | null = null;
+
+    // Listen for sign out events from other tabs/windows
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'patron-signout-event' && e.newValue) {
+        console.log('Sign out detected from another tab');
+        setIsAuthenticated(false);
+        setUser(null);
+        window.location.replace('/login?fresh=true&signed_out=true');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
     
     // Add shorter timeout to prevent infinite loading on mobile
     const loadingTimeout = setTimeout(() => {
@@ -416,6 +428,7 @@ export default function Home() {
       }
       clearInterval(sessionRefreshInterval);
       subscription.unsubscribe();
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, [router, isAuthenticated, user, lastActivity]);
 

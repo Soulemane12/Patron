@@ -23,23 +23,35 @@ export default function LoginPage() {
     // Clean session selectively when needed
     const handleSession = async () => {
       try {
-        // Only clear this specific device's session data if fresh=true 
-        // This allows other devices to stay logged in with shared accounts
-        if (urlParams.get('fresh') === 'true') {
-          // Clear only the auth token, not everything
-          localStorage.removeItem('patron-auth');
-          sessionStorage.removeItem('patron-auth');
+        // Handle fresh login (usually from sign out)
+        if (urlParams.get('fresh') === 'true' || urlParams.get('signed_out') === 'true') {
+          console.log('Fresh login detected, clearing all session data thoroughly...');
           
-          // Clear only auth-related cookies
-          document.cookie.split(';').forEach(c => {
-            const trimmed = c.trim();
-            if (trimmed.startsWith('patron-auth=') || 
-                trimmed.startsWith('patron-auth-exists=') ||
-                trimmed.startsWith('supabase-auth-token=')) {
-              document.cookie = trimmed.split('=')[0] + '=;expires=' + new Date().toUTCString() + ';path=/';
-            }
+          // Clear all storage completely for a clean sign out
+          try {
+            localStorage.clear();
+            sessionStorage.clear();
+          } catch (e) {
+            console.warn('Storage clear error:', e);
+          }
+          
+          // Clear all possible auth cookies aggressively
+          const cookiesToClear = [
+            'patron-auth',
+            'patron-auth-exists', 
+            'patron-safari-session',
+            'supabase-auth-token',
+            'sb-auth-token'
+          ];
+
+          cookiesToClear.forEach(cookieName => {
+            document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+            document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
+            document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax;`;
+            document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=None; Secure;`;
           });
-          console.log('Session cleaned up for this device');
+          
+          console.log('All session data cleared for fresh sign out');
         }
         
         // Attempt auto-login from cookies for mobile devices
