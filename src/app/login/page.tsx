@@ -12,12 +12,41 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [accountPaused, setAccountPaused] = useState(false);
 
-  // Check for account paused message in URL
+  // Check for messages in URL and enforce clean session
   useEffect(() => {
+    // Handle URL params
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('message') === 'account_paused') {
       setAccountPaused(true);
     }
+    
+    // Force clean session on login page to prevent stale sessions
+    const cleanupSession = async () => {
+      try {
+        // Clear any lingering session data
+        if (urlParams.get('fresh') === 'true') {
+          localStorage.clear();
+          sessionStorage.clear();
+          document.cookie.split(';').forEach(c => {
+            document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+          });
+          console.log('Session cleaned up successfully');
+        }
+        
+        // Listen for logout events from other tabs
+        window.addEventListener('storage', (event) => {
+          if (event.key === 'app-logout') {
+            console.log('Logout detected from another tab');
+            localStorage.removeItem('patron-auth');
+            sessionStorage.removeItem('patron-auth');
+          }
+        });
+      } catch (err) {
+        console.error('Error during session cleanup:', err);
+      }
+    };
+    
+    cleanupSession();
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
