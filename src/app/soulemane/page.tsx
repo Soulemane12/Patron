@@ -155,21 +155,23 @@ export default function AdminPage() {
     return { total, active, completed, notPaid, paid, cancelled };
   };
 
-  const handlePauseUser = async (userId: string, action: 'pause' | 'unpause') => {
+  const handlePauseUser = async (userId: string, action: 'pause' | 'unpause' | 'force_unpause') => {
     setPausingUser(userId);
     try {
-      // First check if user_status table exists
-      const checkResponse = await fetch('/api/admin/users', {
-        headers: {
-          'Authorization': 'Bearer soulemane'
+      // First check if user_status table exists (unless force unpausing)
+      if (action !== 'force_unpause') {
+        const checkResponse = await fetch('/api/admin/users', {
+          headers: {
+            'Authorization': 'Bearer soulemane'
+          }
+        });
+        
+        if (!checkResponse.ok) {
+          throw new Error('Failed to check user status');
         }
-      });
-      
-      if (!checkResponse.ok) {
-        throw new Error('Failed to check user status');
       }
       
-      // Now attempt the pause/unpause
+      // Now attempt the pause/unpause/force_unpause
       const response = await fetch('/api/admin/users/pause', {
         method: 'POST',
         headers: {
@@ -181,14 +183,17 @@ export default function AdminPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to pause/unpause user');
+        throw new Error(errorData.error || `Failed to ${action.replace('_', ' ')} user`);
       }
+
+      const result = await response.json();
+      alert(result.message || `User ${action.replace('_', ' ')}d successfully`);
 
       // Reload data to reflect changes
       loadAllData();
     } catch (error: any) {
-      console.error('Error pausing/unpausing user:', error);
-      alert(`Failed to ${action} user: ${error.message || 'Unknown error'}`);
+      console.error(`Error ${action.replace('_', ' ')}ing user:`, error);
+      alert(`Failed to ${action.replace('_', ' ')} user: ${error.message || 'Unknown error'}`);
     } finally {
       setPausingUser(null);
     }
@@ -689,13 +694,27 @@ export default function AdminPage() {
                                    View Customers
                                  </button>
                                  {user.is_paused ? (
-                                   <button
-                                     onClick={() => handlePauseUser(user.id, 'unpause')}
-                                     disabled={pausingUser === user.id}
-                                     className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 disabled:opacity-50"
-                                   >
-                                     {pausingUser === user.id ? 'Unpausing...' : 'Unpause'}
-                                   </button>
+                                   <div className="flex gap-1 flex-wrap">
+                                     <button
+                                       onClick={() => handlePauseUser(user.id, 'unpause')}
+                                       disabled={pausingUser === user.id}
+                                       className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600 disabled:opacity-50"
+                                     >
+                                       {pausingUser === user.id ? 'Unpausing...' : 'Unpause'}
+                                     </button>
+                                     <button
+                                       onClick={() => {
+                                         if (confirm('Force unpause will completely remove pause status. Continue?')) {
+                                           handlePauseUser(user.id, 'force_unpause');
+                                         }
+                                       }}
+                                       disabled={pausingUser === user.id}
+                                       className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 disabled:opacity-50"
+                                       title="Force remove pause status completely"
+                                     >
+                                       Force Fix
+                                     </button>
+                                   </div>
                                  ) : (
                                    <button
                                      onClick={() => handlePauseUser(user.id, 'pause')}

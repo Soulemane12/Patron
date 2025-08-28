@@ -9,17 +9,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { userId, action } = await request.json();
+    const { userId, action, forceUnpause } = await request.json();
 
     if (!userId || !action) {
       return NextResponse.json({ error: 'Missing userId or action' }, { status: 400 });
     }
 
-    if (action !== 'pause' && action !== 'unpause') {
+    if (action !== 'pause' && action !== 'unpause' && action !== 'force_unpause') {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
     const isPaused = action === 'pause';
+    const isForceUnpause = action === 'force_unpause' || forceUnpause;
 
     try {
       // First ensure the user_status table exists and has all required columns
@@ -49,7 +50,22 @@ export async function POST(request: NextRequest) {
         console.error('Error checking user status:', checkError);
       }
   
-      if (existingStatus) {
+      // Handle force unpause - delete the record entirely to ensure clean state
+      if (isForceUnpause) {
+        console.log('Force unpausing user - deleting user_status record');
+        const { error: deleteError } = await supabaseAdmin
+          .from('user_status')
+          .delete()
+          .eq('user_id', userId);
+        
+        if (deleteError) {
+          console.error('Error force unpausing user:', deleteError);
+          return NextResponse.json({ 
+            error: `Failed to force unpause user: ${deleteError.message}`, 
+            details: deleteError 
+          }, { status: 500 });
+        }
+      } else if (existingStatus) {
         // Update existing record
         const { error } = await supabaseAdmin
           .from('user_status')
@@ -68,23 +84,26 @@ export async function POST(request: NextRequest) {
           }, { status: 500 });
         }
       } else {
-        // Create new record
-        const { error } = await supabaseAdmin
-          .from('user_status')
-          .insert({
-            user_id: userId,
-            is_paused: isPaused,
-            paused_at: isPaused ? new Date().toISOString() : null,
-            paused_by: isPaused ? 'admin' : null
-          });
-  
-        if (error) {
-          console.error('Error creating user status:', error);
-          return NextResponse.json({ 
-            error: `Failed to create user status: ${error.message}`, 
-            details: error 
-          }, { status: 500 });
+        // Create new record only if we're pausing (not unpausing non-existent record)
+        if (isPaused) {
+          const { error } = await supabaseAdmin
+            .from('user_status')
+            .insert({
+              user_id: userId,
+              is_paused: true,
+              paused_at: new Date().toISOString(),
+              paused_by: 'admin'
+            });
+    
+          if (error) {
+            console.error('Error creating user status:', error);
+            return NextResponse.json({ 
+              error: `Failed to create user status: ${error.message}`, 
+              details: error 
+            }, { status: 500 });
+          }
         }
+        // If unpausing and no record exists, that means user is already unpaused - success
       }
     } catch (error: any) {
       console.error('Error managing user status:', error);
@@ -95,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: `User ${isPaused ? 'paused' : 'unpaused'} successfully` 
+      message: isForceUnpause ? 'User force unpaused successfully' : `User ${isPaused ? 'paused' : 'unpaused'} successfully` 
     });
 
   } catch (error) {
