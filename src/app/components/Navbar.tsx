@@ -17,37 +17,28 @@ export default function Navbar({ activeSection, onSectionChange }: NavbarProps) 
     try {
       setIsSigningOut(true);
       
-      // Clear all session data first to ensure clean logout
+      // Perform a local signOut instead of global to maintain other devices' sessions
+      // This allows multiple people to share the same account
+      await supabase.auth.signOut({ 
+        scope: 'local' // Important: Only sign out this device
+      });
+      
+      // Clear local storage for this device
       localStorage.removeItem('patron-auth');
       sessionStorage.removeItem('patron-auth');
       
-      // Kill all other tabs' sessions through browser storage event
-      localStorage.setItem('app-logout', Date.now().toString());
-      
-      // Use fetch directly to bypass Supabase client cache
-      await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-        },
-        credentials: 'include',
+      // Clear cookies for this device
+      document.cookie.split(';').forEach(c => {
+        if (c.trim().startsWith('patron-auth=') || c.trim().startsWith('patron-auth-exists=')) {
+          document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+        }
       });
-      
-      // Then call the official signOut method
-      await supabase.auth.signOut({ scope: 'global' });
-      
-      // Final cleanup of any potential session data
-      localStorage.clear();
-      sessionStorage.clear();
       
       // Force redirect to login page
       window.location.href = '/login?fresh=true';
     } catch (error) {
       console.error('Sign out failed', error);
-      // Force clear session data and redirect even on error
-      localStorage.clear();
-      sessionStorage.clear();
+      // Force redirect even on error
       window.location.href = '/login?fresh=true';
     }
   }

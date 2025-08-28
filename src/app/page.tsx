@@ -84,11 +84,48 @@ export default function Home() {
     // Add shorter timeout to prevent infinite loading on mobile
     const loadingTimeout = setTimeout(() => {
       if (mounted && isLoadingAuth) {
-        console.log('Loading timeout reached, forcing authentication check completion');
-        setIsLoadingAuth(false);
-        window.location.href = '/login';  // Use direct navigation instead of router
+        console.log('Loading timeout reached, checking for mobile token...');
+        
+        // Check for mobile backup token in cookies before giving up
+        const mobileCookieCheck = async () => {
+          try {
+            const cookies = document.cookie.split(';');
+            const mobileCookie = cookies.find(c => c.trim().startsWith('patron-mobile-token='));
+            
+            if (mobileCookie) {
+              // We found a mobile token, try to use it
+              const token = decodeURIComponent(mobileCookie.split('=')[1]);
+              
+              try {
+                // Attempt to refresh session
+                await supabase.auth.refreshSession();
+                // Re-check the session
+                const { data, error } = await supabase.auth.getSession();
+                if (data.session) {
+                  console.log('Successfully recovered mobile session');
+                  setUser(data.session.user);
+                  setIsAuthenticated(true);
+                  setIsLoadingAuth(false);
+                  return;
+                }
+              } catch (e) {
+                console.warn('Could not use mobile token:', e);
+              }
+            }
+            
+            // If we get here, the mobile recovery failed
+            setIsLoadingAuth(false);
+            window.location.href = '/login';
+          } catch (e) {
+            console.error('Error in mobile recovery:', e);
+            setIsLoadingAuth(false);
+            window.location.href = '/login';
+          }
+        };
+        
+        mobileCookieCheck();
       }
-    }, 5000); // 5 second timeout - faster feedback
+    }, 8000); // 8 second timeout with mobile recovery attempt
 
     // Faster auth check with timeout handling
     const checkAuth = async () => {
