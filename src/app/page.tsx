@@ -498,6 +498,10 @@ export default function Home() {
       return;
     }
 
+    // Detect Safari mobile for special handling
+    const isSafariMobile = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
+    console.log('Safari mobile detected:', isSafariMobile);
+
     // Prevent multiple simultaneous saves
     if (isSaving) {
       console.log('Save already in progress, ignoring duplicate request');
@@ -509,45 +513,58 @@ export default function Home() {
     
     console.log('Starting save operation for customer:', formattedInfo.name);
 
-    // Add timeout to prevent hanging
-    const saveTimeout = setTimeout(() => {
-      setError('Save operation timed out. Please try again.');
-      setIsSaving(false);
-    }, 30000); // 30 second timeout
-
     try {
-      console.log('Saving customer...');
-
       // Determine status - if leadSize indicates paid, set to completed
       let status = 'active'; // Default status for new customers
 
-      // Create a promise that can be aborted
-      const savePromise = supabase
-        .from('customers')
-        .insert([
-          {
-            user_id: user.id,
-            name: formattedInfo.name,
-            email: formattedInfo.email,
-            phone: formattedInfo.phone,
-            service_address: formattedInfo.serviceAddress,
-            installation_date: formattedInfo.installationDate,
-            installation_time: formattedInfo.installationTime,
-            status: status,
-            is_referral: formattedInfo.isReferral || false,
-            referral_source: formattedInfo.isReferral ? formattedInfo.referralSource : null,
-            lead_size: formattedInfo.leadSize || '2GIG', // Default to 2GIG as requested
-          },
-        ])
-        .select();
+      const customerData = {
+        user_id: user.id,
+        name: formattedInfo.name,
+        email: formattedInfo.email,
+        phone: formattedInfo.phone,
+        service_address: formattedInfo.serviceAddress,
+        installation_date: formattedInfo.installationDate,
+        installation_time: formattedInfo.installationTime,
+        status: status,
+        is_referral: formattedInfo.isReferral || false,
+        referral_source: formattedInfo.isReferral ? formattedInfo.referralSource : null,
+        lead_size: formattedInfo.leadSize || '2GIG', // Default to 2GIG as requested
+      };
 
-      // Add timeout to the save operation
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Save operation timed out')), 25000);
-      });
+      console.log('Inserting customer data:', customerData);
 
-      const result = await Promise.race([savePromise, timeoutPromise]);
-      const { data, error } = result;
+      // Safari mobile-optimized save operation
+      let saveResult;
+      if (isSafariMobile) {
+        // For Safari mobile, use a more conservative approach
+        console.log('Using Safari mobile optimized save...');
+        
+        // Shorter timeout for Safari mobile
+        const safariSavePromise = supabase
+          .from('customers')
+          .insert([customerData])
+          .select();
+
+        const safariTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Safari mobile save timeout')), 10000); // 10 second timeout
+        });
+
+        saveResult = await Promise.race([safariSavePromise, safariTimeoutPromise]);
+      } else {
+        // Standard save for other browsers
+        const savePromise = supabase
+          .from('customers')
+          .insert([customerData])
+          .select();
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Save operation timed out')), 20000); // 20 second timeout
+        });
+
+        saveResult = await Promise.race([savePromise, timeoutPromise]);
+      }
+
+      const { data, error } = saveResult;
 
       if (error) {
         console.error('Supabase error:', error);
@@ -560,35 +577,82 @@ export default function Home() {
 
       console.log('Customer saved successfully:', data[0]);
 
+      // Show success feedback
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 3000);
 
       // Clear the form first
       clearForm();
 
-      // Add a small delay to ensure the database operation is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Safari mobile needs more time to process
+      const delayTime = isSafariMobile ? 1500 : 500;
+      console.log(`Waiting ${delayTime}ms before reloading customers...`);
+      await new Promise(resolve => setTimeout(resolve, delayTime));
 
-      // Reload customers with retry logic to ensure reliability
-      let loadAttempt = 0;
-      const maxLoadAttempts = 3;
-      
-      while (loadAttempt < maxLoadAttempts) {
+      // Force a complete reload of customers with Safari mobile optimization
+      if (isSafariMobile) {
+        console.log('Safari mobile: Force refreshing customer list...');
+        
+        // For Safari mobile, force a complete state reset
+        setCustomers([]); // Clear current customers
+        await new Promise(resolve => setTimeout(resolve, 200)); // Brief pause
+        
+        // Try multiple approaches for Safari mobile
+        let safariLoadSuccess = false;
+        
         try {
-          loadAttempt++;
-          console.log(`Loading customers attempt ${loadAttempt}/${maxLoadAttempts}`);
-          await loadCustomers();
-          break; // Success
-        } catch (loadError) {
-          console.warn(`Load customers attempt ${loadAttempt} failed:`, loadError);
-          if (loadAttempt < maxLoadAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+          // Method 1: Direct reload with fresh query
+          const { data: freshCustomers, error: freshError } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+          
+          if (!freshError && freshCustomers) {
+            console.log('Safari mobile: Successfully loaded customers directly');
+            setCustomers(freshCustomers);
+            safariLoadSuccess = true;
           }
-          // Don't fail the save operation if reload fails - user can manually refresh
+        } catch (directError) {
+          console.warn('Safari mobile: Direct load failed, trying standard method');
+        }
+        
+        // Method 2: Fallback to standard loadCustomers if direct method failed
+        if (!safariLoadSuccess) {
+          try {
+            await loadCustomers();
+            safariLoadSuccess = true;
+          } catch (standardError) {
+            console.warn('Safari mobile: Standard load also failed');
+          }
+        }
+        
+        // Method 3: Force page refresh as last resort for Safari mobile
+        if (!safariLoadSuccess) {
+          console.log('Safari mobile: All reload methods failed, will switch to pipeline view anyway');
+        }
+      } else {
+        // Standard retry logic for other browsers
+        let loadAttempt = 0;
+        const maxLoadAttempts = 3;
+        
+        while (loadAttempt < maxLoadAttempts) {
+          try {
+            loadAttempt++;
+            console.log(`Loading customers attempt ${loadAttempt}/${maxLoadAttempts}`);
+            await loadCustomers();
+            break; // Success
+          } catch (loadError) {
+            console.warn(`Load customers attempt ${loadAttempt} failed:`, loadError);
+            if (loadAttempt < maxLoadAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
         }
       }
 
       // Switch to customers view after saving
+      console.log('Switching to pipeline view...');
       setActiveSection('pipeline');
 
     } catch (error) {
@@ -606,9 +670,14 @@ export default function Home() {
         setError('An unexpected error occurred while saving the customer.');
       }
     } finally {
-      clearTimeout(saveTimeout);
       // Ensure isSaving is always set to false, even if there are errors
-      setTimeout(() => setIsSaving(false), 100);
+      // Use longer delay for Safari mobile to prevent button state issues
+      const finalizeDelay = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent) ? 300 : 100;
+      
+      setTimeout(() => {
+        setIsSaving(false);
+        console.log('Save operation finalized, button re-enabled');
+      }, finalizeDelay);
     }
   };
 
@@ -1611,7 +1680,10 @@ export default function Home() {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z" />
                 </svg>
-                {isSaving ? 'Saving...' : 'Add to Pipeline'}
+                {isSaving ? 
+                  (/iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent) ? 
+                    'Saving (Safari)...' : 'Saving...') 
+                  : 'Add to Pipeline'}
               </span>
             </button>
             {showSaved && (
