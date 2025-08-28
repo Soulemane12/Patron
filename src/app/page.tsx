@@ -42,7 +42,21 @@ export default function Home() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedDateInstallations, setSelectedDateInstallations] = useState<Customer[]>([]);
-  const [activeSection, setActiveSection] = useState<string>('pipeline');
+  const [activeSection, setActiveSection] = useState<string>(() => {
+    // Try to get the last active section from localStorage on page load
+    if (typeof window !== 'undefined') {
+      try {
+        const savedSection = localStorage.getItem('patron-active-section');
+        // Only return saved section if it's valid, otherwise default to pipeline
+        if (savedSection && ['pipeline', 'calendar', 'add', 'stats'].includes(savedSection)) {
+          return savedSection;
+        }
+      } catch (error) {
+        console.warn('Could not load saved section:', error);
+      }
+    }
+    return 'pipeline'; // Default fallback
+  });
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [sortBy, setSortBy] = useState<string>('created_at');
@@ -87,6 +101,10 @@ export default function Home() {
         console.log('Sign out detected from another tab');
         setIsAuthenticated(false);
         setUser(null);
+        // Clear saved section preference on logout
+        try {
+          localStorage.removeItem('patron-active-section');
+        } catch (e) {}
         window.location.replace('/login?fresh=true&signed_out=true');
       }
     };
@@ -651,9 +669,20 @@ export default function Home() {
         }
       }
 
-      // Switch to customers view after saving
-      console.log('Switching to pipeline view...');
-      setActiveSection('pipeline');
+      // Switch to customers view after saving, but only if we were on the "Add Lead" section
+      // This preserves the user's preferred section if they were elsewhere
+      if (activeSection === 'add') {
+        console.log('Switching to pipeline view after adding lead...');
+        setActiveSection('pipeline');
+        // Save the new section to localStorage
+        try {
+          localStorage.setItem('patron-active-section', 'pipeline');
+        } catch (error) {
+          console.warn('Could not save section change:', error);
+        }
+      } else {
+        console.log('Staying in current section after save:', activeSection);
+      }
 
     } catch (error) {
       console.error('Error saving customer:', error);
@@ -773,6 +802,13 @@ export default function Home() {
   
   const handleSectionChange = (section: string) => {
     setActiveSection(section);
+    
+    // Save the active section to localStorage for persistence across reloads
+    try {
+      localStorage.setItem('patron-active-section', section);
+    } catch (error) {
+      console.warn('Could not save active section:', error);
+    }
     
     // If switching to calendar view, reset the selected date
     if (section === 'calendar' && !selectedDate) {
