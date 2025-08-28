@@ -22,20 +22,20 @@ export async function POST(request: NextRequest) {
     const isPaused = action === 'pause';
 
     try {
-      // First check if the user_status table exists
-      const { error: tableCheckError } = await supabaseAdmin
-        .from('user_status')
-        .select('count(*)', { count: 'exact', head: true });
+      // First ensure the user_status table exists and has all required columns
+      console.log('Ensuring user_status table exists with all required columns...');
+      const { error: rpcError } = await supabaseAdmin.rpc('create_user_status_if_not_exists');
       
-      if (tableCheckError) {
-        console.error('Error checking user_status table:', tableCheckError);
-        
-        // Create the user_status table if it doesn't exist
-        await supabaseAdmin.rpc('create_user_status_if_not_exists');
-        
-        // Wait a moment for the table to be created
-        await new Promise(resolve => setTimeout(resolve, 500));
+      if (rpcError) {
+        console.error('Error creating/updating user_status table:', rpcError);
+        return NextResponse.json({ 
+          error: `Failed to prepare user status table: ${rpcError.message}`, 
+          details: rpcError 
+        }, { status: 500 });
       }
+      
+      // Wait a moment for schema changes to be applied
+      await new Promise(resolve => setTimeout(resolve, 1000));
     
       // Now check if this specific user status exists
       const { data: existingStatus, error: checkError } = await supabaseAdmin

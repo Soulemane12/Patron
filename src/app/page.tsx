@@ -493,10 +493,21 @@ export default function Home() {
   };
 
   const saveCustomer = async () => {
-    if (!formattedInfo || !user) return;
+    if (!formattedInfo || !user) {
+      console.warn('Missing formattedInfo or user data');
+      return;
+    }
+
+    // Prevent multiple simultaneous saves
+    if (isSaving) {
+      console.log('Save already in progress, ignoring duplicate request');
+      return;
+    }
 
     setIsSaving(true);
     setError(''); // Clear any previous errors
+    
+    console.log('Starting save operation for customer:', formattedInfo.name);
 
     // Add timeout to prevent hanging
     const saveTimeout = setTimeout(() => {
@@ -556,28 +567,48 @@ export default function Home() {
       clearForm();
 
       // Add a small delay to ensure the database operation is complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Reload customers with the new data
-      await loadCustomers();
+      // Reload customers with retry logic to ensure reliability
+      let loadAttempt = 0;
+      const maxLoadAttempts = 3;
+      
+      while (loadAttempt < maxLoadAttempts) {
+        try {
+          loadAttempt++;
+          console.log(`Loading customers attempt ${loadAttempt}/${maxLoadAttempts}`);
+          await loadCustomers();
+          break; // Success
+        } catch (loadError) {
+          console.warn(`Load customers attempt ${loadAttempt} failed:`, loadError);
+          if (loadAttempt < maxLoadAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          // Don't fail the save operation if reload fails - user can manually refresh
+        }
+      }
 
       // Switch to customers view after saving
       setActiveSection('pipeline');
 
     } catch (error) {
       console.error('Error saving customer:', error);
+      
       if (error instanceof Error) {
         if (error.message.includes('timed out')) {
           setError('Save operation timed out. Please check your connection and try again.');
+        } else if (error.message.includes('network')) {
+          setError('Network error. Please check your connection and try again.');
         } else {
-          setError(error.message);
+          setError(`Save failed: ${error.message}`);
         }
       } else {
-        setError('Failed to save customer');
+        setError('An unexpected error occurred while saving the customer.');
       }
     } finally {
       clearTimeout(saveTimeout);
-      setIsSaving(false);
+      // Ensure isSaving is always set to false, even if there are errors
+      setTimeout(() => setIsSaving(false), 100);
     }
   };
 
