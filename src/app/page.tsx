@@ -91,6 +91,34 @@ export default function Home() {
           try {
             console.log('Timeout reached, attempting mobile session recovery...');
             
+            // Check for Safari mobile specific session recovery
+            const isSafariMobile = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
+            
+            if (isSafariMobile) {
+              console.log('Safari mobile timeout - checking for Safari session cookie');
+              const cookies = document.cookie.split('; ');
+              const safariCookie = cookies.find(c => c.startsWith('patron-safari-session='));
+              
+              if (safariCookie) {
+                console.log('Found Safari session cookie, attempting recovery');
+                try {
+                  // Force a session refresh with the found token
+                  await supabase.auth.refreshSession();
+                  const { data: recoveredSession } = await supabase.auth.getSession();
+                  
+                  if (recoveredSession.session) {
+                    console.log('Successfully recovered Safari mobile session');
+                    setUser(recoveredSession.session.user);
+                    setIsAuthenticated(true);
+                    setIsLoadingAuth(false);
+                    return;
+                  }
+                } catch (e) {
+                  console.warn('Safari session recovery failed:', e);
+                }
+              }
+            }
+            
             // Try one more time to get the session with a fresh attempt
             try {
               const { data: freshSessionData, error: freshError } = await supabase.auth.getSession();

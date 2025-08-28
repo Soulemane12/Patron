@@ -121,11 +121,36 @@ export default function LoginPage() {
           console.warn('Session refresh failed:', refreshError);
         }
         
-        // Add a small delay to ensure session is fully processed
-        setTimeout(() => {
-          console.log('Redirecting to dashboard...');
-          window.location.replace('/'); // Use replace instead of href for better mobile support
-        }, 500);
+        // For Safari mobile, add extra delay and force session refresh
+        const isSafariMobile = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
+        
+        if (isSafariMobile) {
+          console.log('Safari mobile detected, using enhanced redirect');
+          // Force session to be stored in cookies for Safari
+          try {
+            const yearFromNow = new Date();
+            yearFromNow.setFullYear(yearFromNow.getFullYear() + 1);
+            if (location.protocol === 'https:') {
+              document.cookie = `patron-safari-session=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
+            } else {
+              document.cookie = `patron-safari-session=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
+            }
+          } catch (e) {
+            console.warn('Could not set Safari session cookie:', e);
+          }
+          
+          // Longer delay for Safari to process the session
+          setTimeout(() => {
+            console.log('Redirecting Safari mobile to dashboard...');
+            window.location.replace('/');
+          }, 1000);
+        } else {
+          // Standard delay for other browsers
+          setTimeout(() => {
+            console.log('Redirecting to dashboard...');
+            window.location.replace('/');
+          }, 500);
+        }
         
       } else {
         console.error('Login succeeded but no session/user found');
