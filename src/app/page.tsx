@@ -80,6 +80,15 @@ export default function Home() {
     let authCheckAttempts = 0;
     const maxAuthAttempts = 3;
     let retryTimeout: NodeJS.Timeout | null = null;
+    
+    // Add timeout to prevent infinite loading on mobile
+    const loadingTimeout = setTimeout(() => {
+      if (mounted && isLoadingAuth) {
+        console.log('Loading timeout reached, forcing authentication check completion');
+        setIsLoadingAuth(false);
+        router.push('/login');
+      }
+    }, 10000); // 10 second timeout
 
     const checkAuth = async () => {
       try {
@@ -129,7 +138,11 @@ export default function Home() {
 
             if (userStatus?.is_paused) {
               // User is paused, redirect to login with message
+              console.log('User account is paused, signing out...');
               await supabase.auth.signOut();
+              // Clear all local storage to ensure no cached data
+              localStorage.clear();
+              sessionStorage.clear();
               if (mounted) {
                 router.push('/login?message=account_paused');
               }
@@ -339,6 +352,7 @@ export default function Home() {
     return () => {
       mounted = false;
       clearTimeout(timer);
+      clearTimeout(loadingTimeout);
       if (retryTimeout) {
         clearTimeout(retryTimeout);
       }

@@ -49,13 +49,14 @@ export default function AdminPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Check authentication on component mount
   useEffect(() => {
     const authStatus = localStorage.getItem('adminAuthenticated');
     if (authStatus === 'true') {
       setIsAuthenticated(true);
-      loadAllData();
+      // Don't load data automatically
     }
   }, []);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -88,7 +89,7 @@ export default function AdminPage() {
       setIsAuthenticated(true);
       setError('');
       localStorage.setItem('adminAuthenticated', 'true');
-      loadAllData();
+      // Don't load data automatically
     } else {
       setError('Incorrect password');
     }
@@ -105,6 +106,7 @@ export default function AdminPage() {
     setShowAddLeadForm(false);
     setEditingCustomer(null);
     setJustAddedLead(false);
+    setDataLoaded(false);
     localStorage.removeItem('adminAuthenticated');
   };
 
@@ -125,6 +127,7 @@ export default function AdminPage() {
       const data = await response.json();
       setUsers(data.users || []);
       setCustomers(data.customers || []);
+      setDataLoaded(true);
     } catch (error) {
       console.error('Error loading admin data:', error);
     } finally {
@@ -332,7 +335,18 @@ export default function AdminPage() {
             </button>
           </div>
           
-          {loading ? (
+          {!dataLoaded ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <p className="text-gray-600">Click the button below to load user data</p>
+              <button
+                onClick={loadAllData}
+                disabled={loading}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Loading Data...' : 'Load All Data'}
+              </button>
+            </div>
+          ) : loading ? (
             <div className="flex justify-center py-8">
               <LoadingSpinner />
             </div>

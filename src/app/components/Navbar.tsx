@@ -16,12 +16,21 @@ export default function Navbar({ activeSection, onSectionChange }: NavbarProps) 
   async function handleSignOut() {
     try {
       setIsSigningOut(true);
-      await supabase.auth.signOut();
-      router.push('/login');
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out failed', error);
+        // Force clear session data
+        localStorage.clear();
+        sessionStorage.clear();
+      }
+      // Force redirect to login page
+      window.location.href = '/login';
     } catch (error) {
       console.error('Sign out failed', error);
-    } finally {
-      setIsSigningOut(false);
+      // Force clear session data and redirect even on error
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/login';
     }
   }
 

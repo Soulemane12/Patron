@@ -38,6 +38,27 @@ CREATE INDEX idx_email_notifications_customer_id ON email_notifications(customer
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_notifications ENABLE ROW LEVEL SECURITY;
 
+-- Create user_status table to track paused users
+CREATE TABLE user_status (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  is_paused BOOLEAN DEFAULT false,
+  paused_at TIMESTAMP WITH TIME ZONE,
+  paused_by TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for user_status
+CREATE INDEX idx_user_status_user_id ON user_status(user_id);
+
+-- Enable RLS on user_status
+ALTER TABLE user_status ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for user_status (admin only)
+CREATE POLICY "Admin can manage user_status" ON user_status 
+  FOR ALL USING (true);
+
 -- Create policies for user data isolation
 -- Users can only see, insert, update, and delete their own customers
 CREATE POLICY "Users can view own customers" ON customers 
