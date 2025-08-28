@@ -87,15 +87,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storageKey: 'patron-auth',
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'pkce',
+    flowType: 'implicit', // Change to implicit for better mobile support
     debug: true, // Enable debug to help diagnose mobile issues
     storage: mobileStorage
-    // Allow multiple sessions per user is enabled by default in the latest version
   },
-  // Add global error handler
+  // Add global error handler and timeout
   global: {
     headers: {
       'X-Client-Info': 'supabase-js/2.53.0'
+    },
+    fetch: (input, init) => {
+      // Add timeout to all requests for mobile
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      return fetch(input, {
+        ...init,
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
     }
   }
 });

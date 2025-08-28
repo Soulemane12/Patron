@@ -89,31 +89,23 @@ export default function Home() {
         // Check for mobile backup token in cookies before giving up
         const mobileCookieCheck = async () => {
           try {
-            const cookies = document.cookie.split(';');
-            const mobileCookie = cookies.find(c => c.trim().startsWith('patron-mobile-token='));
+            console.log('Timeout reached, attempting mobile session recovery...');
             
-            if (mobileCookie) {
-              // We found a mobile token, try to use it
-              const token = decodeURIComponent(mobileCookie.split('=')[1]);
-              
-              try {
-                // Attempt to refresh session
-                await supabase.auth.refreshSession();
-                // Re-check the session
-                const { data, error } = await supabase.auth.getSession();
-                if (data.session) {
-                  console.log('Successfully recovered mobile session');
-                  setUser(data.session.user);
-                  setIsAuthenticated(true);
-                  setIsLoadingAuth(false);
-                  return;
-                }
-              } catch (e) {
-                console.warn('Could not use mobile token:', e);
+            // Try one more time to get the session with a fresh attempt
+            try {
+              const { data: freshSessionData, error: freshError } = await supabase.auth.getSession();
+              if (!freshError && freshSessionData.session) {
+                console.log('Found session on final attempt!');
+                setUser(freshSessionData.session.user);
+                setIsAuthenticated(true);
+                setIsLoadingAuth(false);
+                return;
               }
+            } catch (e) {
+              console.warn('Fresh session attempt failed:', e);
             }
             
-            // If we get here, the mobile recovery failed
+            console.log('No valid session found, redirecting to login');
             setIsLoadingAuth(false);
             window.location.href = '/login';
           } catch (e) {
@@ -129,18 +121,11 @@ export default function Home() {
 
     // Faster auth check with timeout handling
     const checkAuth = async () => {
-      // Set up a request timeout for faster failure detection
-      const authCheckTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Auth check timed out')), 3000)
-      );
-      
       try {
         console.log('Checking authentication...');
 
-        // Get current session first with timeout
-        const sessionPromise = supabase.auth.getSession();
-        const result = await Promise.race([sessionPromise, authCheckTimeout]);
-        const { data: { session }, error: sessionError } = result as any;
+        // Get current session with increased timeout for mobile
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
           console.error('Session error:', sessionError);

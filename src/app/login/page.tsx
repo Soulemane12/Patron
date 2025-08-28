@@ -75,63 +75,71 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     
+    console.log('Login attempt started on mobile device');
+    
     try {
-      // Enhanced mobile-friendly login
-      const mobileOptions = {
-        // Use shorter timeout for mobile devices (prevent waiting too long)
-        timeoutInMs: 15000,
-        // Cookies for mobile browsers that block localStorage
-        useCookies: true
-      };
-      
-      // First check if already logged in
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log('Already logged in, redirecting...');
-        window.location.href = '/';
-        return;
-      }
-      
-      // Proceed with login - using options that support mobile devices better
-      const { data, error } = await supabase.auth.signInWithPassword({ 
+      // Add a timeout to prevent hanging indefinitely
+      const loginPromise = supabase.auth.signInWithPassword({ 
         email, 
         password
       });
       
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Login timeout')), 30000) // 30 second timeout
+      );
+      
+      console.log('Attempting login with timeout protection...');
+      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as any;
+      
       if (error) {
         console.error('Login error:', error);
-        // Special handling for mobile-specific issues
-        if (error.message?.includes('network') || error.message?.includes('timeout')) {
-          setError('Network issue. Please check your connection and try again.');
+        
+        // More specific error handling
+        if (error.message?.includes('Invalid login credentials')) {
+          setError('Invalid email or password. Please check and try again.');
+        } else if (error.message?.includes('timeout') || error.message?.includes('network')) {
+          setError('Connection timeout. Please check your internet and try again.');
+        } else if (error.message?.includes('Email not confirmed')) {
+          setError('Please check your email and confirm your account first.');
         } else {
-          setError(error.message);
+          setError(`Login failed: ${error.message}`);
         }
         setLoading(false);
         return;
       }
       
-      if (data?.session) {
-        console.log('Login successful, storing session...');
+      console.log('Login response received:', data?.session ? 'Session found' : 'No session');
+      
+      if (data?.session && data?.user) {
+        console.log('Login successful! User:', data.user.email);
         
-        // Store session in cookie for better mobile support
+        // Force a complete session refresh to ensure it's properly stored
         try {
-          const yearFromNow = new Date();
-          yearFromNow.setFullYear(yearFromNow.getFullYear() + 1);
-          document.cookie = `patron-mobile-token=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
-        } catch (e) {
-          console.warn('Could not set cookie:', e);
+          await supabase.auth.getSession();
+          console.log('Session refreshed successfully');
+        } catch (refreshError) {
+          console.warn('Session refresh failed:', refreshError);
         }
         
-        // Use direct page navigation for more reliable redirect
-        window.location.href = '/';
+        // Add a small delay to ensure session is fully processed
+        setTimeout(() => {
+          console.log('Redirecting to dashboard...');
+          window.location.replace('/'); // Use replace instead of href for better mobile support
+        }, 500);
+        
       } else {
-        // Session not found despite no error
-        setError('Login failed. Please try again.');
+        console.error('Login succeeded but no session/user found');
+        setError('Login failed - no session created. Please try again.');
         setLoading(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Unexpected login error:', err);
-      setError('An unexpected error occurred. Please try again.');
+      
+      if (err.message === 'Login timeout') {
+        setError('Login is taking too long. Please check your connection and try again.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
       setLoading(false);
     }
   };
@@ -172,9 +180,16 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-medium"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Signing in...</span>
+              </div>
+            ) : (
+              'Sign in'
+            )}
           </button>
         </form>
         <p className="text-center text-sm text-gray-600 mt-4">
