@@ -33,6 +33,7 @@ export default function Home() {
   const [showCopied, setShowCopied] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState('');
   const [showSaved, setShowSaved] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -527,6 +528,7 @@ export default function Home() {
     }
 
     setIsSaving(true);
+    setSaveProgress('');
     setError(''); // Clear any previous errors
     
     console.log('Starting save operation for customer:', formattedInfo.name);
@@ -551,36 +553,64 @@ export default function Home() {
 
       console.log('Inserting customer data:', customerData);
 
-      // Safari mobile-optimized save operation
-      let saveResult;
-      if (isSafariMobile) {
-        // For Safari mobile, use a more conservative approach
-        console.log('Using Safari mobile optimized save...');
+      // Bulletproof save operation with retry logic
+      const performSave = async (attemptNumber = 1): Promise<any> => {
+        const maxAttempts = isSafariMobile ? 5 : 3;
+        const baseTimeout = isSafariMobile ? 30000 : 25000; // Much longer timeouts
+        const currentTimeout = baseTimeout + (attemptNumber - 1) * 10000; // Progressive timeout increase
         
-        // Shorter timeout for Safari mobile
-        const safariSavePromise = supabase
-          .from('customers')
-          .insert([customerData])
-          .select();
+        console.log(`Save attempt ${attemptNumber}/${maxAttempts} with ${currentTimeout/1000}s timeout (Safari: ${isSafariMobile})`);
+        setSaveProgress(`Attempt ${attemptNumber}/${maxAttempts}`);
+        
+        try {
+          const savePromise = supabase
+            .from('customers')
+            .insert([customerData])
+            .select();
 
-        const safariTimeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Safari mobile save timeout')), 10000); // 10 second timeout
-        });
+          // Only use timeout for first few attempts
+          if (attemptNumber < maxAttempts) {
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error(`Save timeout after ${currentTimeout/1000}s (attempt ${attemptNumber})`)), currentTimeout);
+            });
+            return await Promise.race([savePromise, timeoutPromise]);
+          } else {
+            // Final attempt - no timeout, wait as long as needed
+            console.log('Final attempt - removing timeout restrictions, waiting indefinitely...');
+            setSaveProgress('Final attempt...');
+            return await savePromise;
+          }
+          
+        } catch (error) {
+          console.warn(`Save attempt ${attemptNumber} failed:`, error);
+          
+          if (attemptNumber < maxAttempts) {
+            // Exponential backoff delay before retry
+            const delay = Math.min(2000 * attemptNumber, 8000); // 2s, 4s, 6s, 8s delays
+            console.log(`Retrying in ${delay}ms...`);
+            setSaveProgress(`Retrying in ${delay/1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return performSave(attemptNumber + 1);
+          } else {
+            // If all attempts fail, try one last time with a completely fresh connection
+            console.log('All timed attempts failed, trying one final unrestricted save...');
+            setSaveProgress('Emergency save...');
+            try {
+              // Create a fresh supabase call without any timeout pressure
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
+              return await supabase
+                .from('customers')
+                .insert([customerData])
+                .select();
+            } catch (finalError) {
+              console.error('Final save attempt also failed:', finalError);
+              throw new Error(`Save operation failed after ${maxAttempts} attempts. Please try again.`);
+            }
+          }
+        }
+      };
 
-        saveResult = await Promise.race([safariSavePromise, safariTimeoutPromise]);
-      } else {
-        // Standard save for other browsers
-        const savePromise = supabase
-          .from('customers')
-          .insert([customerData])
-          .select();
-
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Save operation timed out')), 20000); // 20 second timeout
-        });
-
-        saveResult = await Promise.race([savePromise, timeoutPromise]);
-      }
+      let saveResult = await performSave();
 
       const { data, error } = saveResult;
 
@@ -705,6 +735,7 @@ export default function Home() {
       
       setTimeout(() => {
         setIsSaving(false);
+        setSaveProgress('');
         console.log('Save operation finalized, button re-enabled');
       }, finalizeDelay);
     }
@@ -1717,8 +1748,11 @@ export default function Home() {
                   <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6z" />
                 </svg>
                 {isSaving ? 
-                  (/iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent) ? 
-                    'Saving (Safari)...' : 'Saving...') 
+                  (saveProgress ? 
+                    ((/iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent)) ? 
+                      `Safari: ${saveProgress}` : `Saving: ${saveProgress}`) 
+                    : ((/iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent)) ? 
+                      'Saving (Safari)...' : 'Saving...'))
                   : 'Add to Pipeline'}
               </span>
             </button>
