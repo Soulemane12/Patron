@@ -155,23 +155,21 @@ export default function AdminPage() {
     return { total, active, completed, notPaid, paid, cancelled };
   };
 
-  const handlePauseUser = async (userId: string, action: 'pause' | 'unpause' | 'force_unpause') => {
+  const handlePauseUser = async (userId: string, action: 'pause' | 'unpause') => {
     setPausingUser(userId);
     try {
-      // First check if user_status table exists (unless force unpausing)
-      if (action !== 'force_unpause') {
-        const checkResponse = await fetch('/api/admin/users', {
-          headers: {
-            'Authorization': 'Bearer soulemane'
-          }
-        });
-        
-        if (!checkResponse.ok) {
-          throw new Error('Failed to check user status');
+      // First check if user_status table exists
+      const checkResponse = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': 'Bearer soulemane'
         }
+      });
+      
+      if (!checkResponse.ok) {
+        throw new Error('Failed to check user status');
       }
       
-      // Now attempt the pause/unpause/force_unpause
+      // Now attempt the pause/unpause
       const response = await fetch('/api/admin/users/pause', {
         method: 'POST',
         headers: {
@@ -435,16 +433,7 @@ export default function AdminPage() {
                 >
                   {showAddLeadForm ? 'Cancel Add Lead' : justAddedLead ? 'Add Another Lead' : 'Add New Lead'}
                 </button>
-                <button
-                  onClick={() => {
-                    setShowAddLeadForm(false);
-                    setEditingCustomer(null);
-                    setJustAddedLead(false);
-                  }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  View All Data
-                </button>
+
               </div>
 
               {/* Add Lead Form */}
@@ -702,18 +691,7 @@ export default function AdminPage() {
                                      >
                                        {pausingUser === user.id ? 'Unpausing...' : 'Unpause'}
                                      </button>
-                                     <button
-                                       onClick={() => {
-                                         if (confirm('Force unpause will completely remove pause status. Continue?')) {
-                                           handlePauseUser(user.id, 'force_unpause');
-                                         }
-                                       }}
-                                       disabled={pausingUser === user.id}
-                                       className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 disabled:opacity-50"
-                                       title="Force remove pause status completely"
-                                     >
-                                       Force Fix
-                                     </button>
+
                                    </div>
                                  ) : (
                                    <button

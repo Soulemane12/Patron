@@ -150,6 +150,35 @@ export default function Home() {
               }
             }
             
+            // Check for recent login indicators
+            const hasLoginIndicators = localStorage.getItem('patron-login-success') || 
+                                     sessionStorage.getItem('patron-session-active') ||
+                                     document.cookie.includes('patron-login-token');
+            
+            if (hasLoginIndicators) {
+              console.log('Found login indicators, attempting enhanced session recovery...');
+              
+              // Clear old indicators
+              localStorage.removeItem('patron-login-success');
+              sessionStorage.removeItem('patron-session-active');
+              
+              // Give more time for session to be established
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              
+              try {
+                const { data: enhancedSessionData, error: enhancedError } = await supabase.auth.getSession();
+                if (!enhancedError && enhancedSessionData.session) {
+                  console.log('Enhanced session recovery successful!');
+                  setUser(enhancedSessionData.session.user);
+                  setIsAuthenticated(true);
+                  setIsLoadingAuth(false);
+                  return;
+                }
+              } catch (e) {
+                console.warn('Enhanced session recovery failed:', e);
+              }
+            }
+            
             // Try one more time to get the session with a fresh attempt
             try {
               const { data: freshSessionData, error: freshError } = await supabase.auth.getSession();

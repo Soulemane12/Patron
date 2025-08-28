@@ -87,21 +87,61 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     
-    console.log('Login attempt started on mobile device');
+    console.log('Login attempt started');
+    
+    // Bulletproof login with retry logic
+    const performLogin = async (attemptNumber = 1): Promise<any> => {
+      const maxAttempts = 3;
+      const baseTimeout = 20000; // 20 seconds base timeout
+      const currentTimeout = baseTimeout + (attemptNumber - 1) * 10000; // Progressive timeout
+      
+      console.log(`Login attempt ${attemptNumber}/${maxAttempts} with ${currentTimeout/1000}s timeout`);
+      
+      try {
+        const loginPromise = supabase.auth.signInWithPassword({ 
+          email, 
+          password
+        });
+        
+        // Only use timeout for first few attempts
+        if (attemptNumber < maxAttempts) {
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`Login timeout after ${currentTimeout/1000}s`)), currentTimeout)
+          );
+          return await Promise.race([loginPromise, timeoutPromise]);
+        } else {
+          // Final attempt - no timeout, wait as long as needed
+          console.log('Final login attempt - removing timeout restrictions...');
+          return await loginPromise;
+        }
+        
+      } catch (error) {
+        console.warn(`Login attempt ${attemptNumber} failed:`, error);
+        
+        // Don't retry for credential errors
+        if (error instanceof Error && (
+          error.message?.includes('Invalid login credentials') ||
+          error.message?.includes('Email not confirmed') ||
+          error.message?.includes('too many requests')
+        )) {
+          throw error;
+        }
+        
+        if (attemptNumber < maxAttempts) {
+          // Retry with delay for timeout/network errors
+          const delay = 2000 * attemptNumber; // 2s, 4s delays
+          console.log(`Retrying login in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return performLogin(attemptNumber + 1);
+        } else {
+          throw error;
+        }
+      }
+    };
     
     try {
-      // Add a timeout to prevent hanging indefinitely
-      const loginPromise = supabase.auth.signInWithPassword({ 
-        email, 
-        password
-      });
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Login timeout')), 30000) // 30 second timeout
-      );
-      
-      console.log('Attempting login with timeout protection...');
-      const { data, error } = await Promise.race([loginPromise, timeoutPromise]) as any;
+      console.log('Starting bulletproof login process...');
+      const { data, error } = await performLogin();
       
       if (error) {
         console.error('Login error:', error);
@@ -133,36 +173,58 @@ export default function LoginPage() {
           console.warn('Session refresh failed:', refreshError);
         }
         
-        // For Safari mobile, add extra delay and force session refresh
+        // Enhanced cross-browser session persistence and redirect
         const isSafariMobile = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
-        if (isSafariMobile) {
-          console.log('Safari mobile detected, using enhanced redirect');
-          // Force session to be stored in cookies for Safari
-          try {
-            const yearFromNow = new Date();
-            yearFromNow.setFullYear(yearFromNow.getFullYear() + 1);
-            if (location.protocol === 'https:') {
+        console.log(`Browser detection: Safari Mobile: ${isSafariMobile}, iOS: ${isIOS}, Mobile: ${isMobile}`);
+        
+        // Enhanced session storage for all browsers
+        try {
+          // Store in multiple places for maximum compatibility
+          localStorage.setItem('patron-login-success', 'true');
+          sessionStorage.setItem('patron-session-active', 'true');
+          
+          // Enhanced cookie storage for all mobile browsers
+          const yearFromNow = new Date();
+          yearFromNow.setFullYear(yearFromNow.getFullYear() + 1);
+          
+          if (location.protocol === 'https:') {
+            document.cookie = `patron-login-token=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
+            if (isSafariMobile || isIOS) {
               document.cookie = `patron-safari-session=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=None; Secure`;
-            } else {
+            }
+          } else {
+            document.cookie = `patron-login-token=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
+            if (isSafariMobile || isIOS) {
               document.cookie = `patron-safari-session=${encodeURIComponent(data.session.access_token)}; expires=${yearFromNow.toUTCString()}; path=/; SameSite=Lax`;
             }
-          } catch (e) {
-            console.warn('Could not set Safari session cookie:', e);
           }
-          
-          // Longer delay for Safari to process the session
-          setTimeout(() => {
-            console.log('Redirecting Safari mobile to dashboard...');
-            window.location.replace('/');
-          }, 1000);
-        } else {
-          // Standard delay for other browsers
-          setTimeout(() => {
-            console.log('Redirecting to dashboard...');
-            window.location.replace('/');
-          }, 500);
+        } catch (e) {
+          console.warn('Could not set enhanced session storage:', e);
         }
+        
+        // Wait for session to fully process before redirect
+        let redirectDelay = 800; // Default
+        if (isSafariMobile) {
+          redirectDelay = 1200; // Extra time for Safari mobile
+        } else if (isIOS || isMobile) {
+          redirectDelay = 1000; // Extra time for mobile devices
+        }
+        
+        console.log(`Using ${redirectDelay}ms redirect delay for this browser`);
+        
+        setTimeout(() => {
+          console.log('Redirecting to dashboard with enhanced session...');
+          // Use the most reliable redirect method
+          try {
+            window.location.replace('/');
+          } catch (e) {
+            console.warn('Replace failed, trying href:', e);
+            window.location.href = '/';
+          }
+        }, redirectDelay);
         
       } else {
         console.error('Login succeeded but no session/user found');
