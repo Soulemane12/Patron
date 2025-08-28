@@ -81,21 +81,29 @@ export default function Home() {
     const maxAuthAttempts = 3;
     let retryTimeout: NodeJS.Timeout | null = null;
     
-    // Add timeout to prevent infinite loading on mobile
+    // Add shorter timeout to prevent infinite loading on mobile
     const loadingTimeout = setTimeout(() => {
       if (mounted && isLoadingAuth) {
         console.log('Loading timeout reached, forcing authentication check completion');
         setIsLoadingAuth(false);
-        router.push('/login');
+        window.location.href = '/login';  // Use direct navigation instead of router
       }
-    }, 10000); // 10 second timeout
+    }, 5000); // 5 second timeout - faster feedback
 
+    // Faster auth check with timeout handling
     const checkAuth = async () => {
+      // Set up a request timeout for faster failure detection
+      const authCheckTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth check timed out')), 3000)
+      );
+      
       try {
         console.log('Checking authentication...');
 
-        // Get current session first
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // Get current session first with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const result = await Promise.race([sessionPromise, authCheckTimeout]);
+        const { data: { session }, error: sessionError } = result as any;
 
         if (sessionError) {
           console.error('Session error:', sessionError);
@@ -876,18 +884,28 @@ export default function Home() {
     }
   }, [customers, filterAndSortCustomers]);
 
-  // Show loading while checking authentication
+  // Show fast loading indicator while checking authentication
   if (isLoadingAuth) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 flex items-center justify-center">
-        <LoadingSpinner />
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 flex flex-col items-center justify-center">
+        <div className="mb-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+        <div className="text-blue-600 text-sm font-medium">Loading your account...</div>
       </div>
     );
   }
 
   // Show login redirect if not authenticated
   if (!isAuthenticated && !isLoadingAuth) {
-    return null; // Router will handle redirect
+    // Force direct navigation to login for more reliability
+    console.log('Not authenticated, redirecting to login...');
+    window.location.href = '/login';
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 flex flex-col items-center justify-center">
+        <div className="text-blue-600 text-sm font-medium">Redirecting to login...</div>
+      </div>
+    );
   }
 
   return (

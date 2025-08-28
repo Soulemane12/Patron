@@ -24,13 +24,43 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-      return;
+    
+    try {
+      // First check if Supabase is accessible
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // Already logged in, redirect immediately
+        window.location.href = '/';
+        return;
+      }
+      
+      // Proceed with login
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+      
+      if (error) {
+        console.error('Login error:', error);
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+      
+      if (data?.session) {
+        console.log('Login successful, redirecting...');
+        // Use direct page navigation for more reliable redirect
+        window.location.href = '/';
+      } else {
+        // Session not found despite no error
+        setError('Login failed. Please try again.');
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Unexpected login error:', err);
+      setError('An unexpected error occurred. Please try again.');
+      setLoading(false);
     }
-    router.push('/');
   };
 
   return (

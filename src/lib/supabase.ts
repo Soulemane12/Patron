@@ -11,6 +11,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     flowType: 'pkce',
     debug: false,
+
     // Increase session timeout and improve persistence
     storage: {
       getItem: (key) => {
