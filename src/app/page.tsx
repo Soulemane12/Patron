@@ -26,8 +26,38 @@ export default function Home() {
   const router = useRouter();
   // Parse a YYYY-MM-DD string as a local-timezone date (avoids UTC shift)
   const parseDateLocal = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
-  const [inputText, setInputText] = useState('');
-  const [formattedInfo, setFormattedInfo] = useState<CustomerInfo | null>(null);
+  const [inputText, setInputText] = useState(() => {
+    // Try to restore input text from localStorage immediately on page load
+    if (typeof window !== 'undefined') {
+      try {
+        const savedInputText = localStorage.getItem('patron-input-text') || 
+                             sessionStorage.getItem('patron-input-text');
+        if (savedInputText) {
+          console.log('🔄 Restored input text from localStorage on page load');
+          return savedInputText;
+        }
+      } catch (error) {
+        console.warn('Could not load saved input text:', error);
+      }
+    }
+    return '';
+  });
+  const [formattedInfo, setFormattedInfo] = useState<CustomerInfo | null>(() => {
+    // Try to restore formatted info from localStorage immediately on page load
+    if (typeof window !== 'undefined') {
+      try {
+        const savedFormattedInfo = localStorage.getItem('patron-formatted-info') || 
+                                 sessionStorage.getItem('patron-formatted-info');
+        if (savedFormattedInfo) {
+          console.log('🔄 Restored formatted info from localStorage on page load');
+          return JSON.parse(savedFormattedInfo);
+        }
+      } catch (error) {
+        console.warn('Could not load saved formatted info:', error);
+      }
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCopied, setShowCopied] = useState(false);
@@ -72,10 +102,17 @@ export default function Home() {
 
   // Load draft data from database when user authenticates
   const loadDraftFromDatabase = async () => {
+    console.log('🔄 Attempting to load draft from database...');
+    
     try {
       const session = await supabase.auth.getSession();
-      if (!session.data.session?.access_token) return;
+      if (!session.data.session?.access_token) {
+        console.log('❌ No session token available for draft loading');
+        loadFromLocalStorageFallback();
+        return;
+      }
 
+      console.log('✅ Session token found, making API request...');
       const response = await fetch('/api/drafts/load', {
         method: 'GET',
         headers: {
@@ -85,23 +122,94 @@ export default function Home() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('📥 API response:', data);
+        
         if (data.success && data.draft) {
-          console.log('Loaded draft from database:', data.draft);
-          if (data.draft.input_text) {
+          console.log('✅ Draft found in database:', data.draft);
+          if (data.draft.input_text && !inputText) {
             setInputText(data.draft.input_text);
+            console.log('📝 Restored input text from database');
           }
-          if (data.draft.formatted_info) {
+          if (data.draft.formatted_info && !formattedInfo) {
             setFormattedInfo(data.draft.formatted_info);
+            console.log('📋 Restored formatted info from database');
           }
+          return; // Successfully loaded from database
+        } else {
+          console.log('📭 No draft found in database, trying localStorage fallback');
+        }
+      } else {
+        console.warn('❌ API request failed:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.warn('Error details:', errorText);
+      }
+    } catch (error) {
+      console.warn('❌ Database draft loading failed:', error);
+    }
+    
+    // Fallback to localStorage if database fails
+    loadFromLocalStorageFallback();
+  };
+
+  // Fallback function to load from localStorage
+  const loadFromLocalStorageFallback = () => {
+    console.log('🔄 Trying localStorage fallback...');
+    
+    try {
+      if (typeof window !== 'undefined') {
+        const savedInputText = localStorage.getItem('patron-input-text') || 
+                             sessionStorage.getItem('patron-input-text');
+        const savedFormattedInfo = localStorage.getItem('patron-formatted-info') || 
+                                 sessionStorage.getItem('patron-formatted-info');
+        
+        if (savedInputText && !inputText) {
+          setInputText(savedInputText);
+          console.log('📝 Restored input text from localStorage');
+        }
+        
+        if (savedFormattedInfo && !formattedInfo) {
+          setFormattedInfo(JSON.parse(savedFormattedInfo));
+          console.log('📋 Restored formatted info from localStorage');
+        }
+        
+        if (savedInputText || savedFormattedInfo) {
+          console.log('✅ Successfully loaded from localStorage fallback');
+        } else {
+          console.log('📭 No saved data found in localStorage either');
         }
       }
     } catch (error) {
-      console.warn('Could not load draft from database:', error);
+      console.warn('❌ localStorage fallback also failed:', error);
     }
   };
 
   // Auto-save input text to database whenever it changes
   useEffect(() => {
+    // Always save to localStorage immediately for instant backup
+    if (typeof window !== 'undefined') {
+      try {
+        if (inputText.trim()) {
+          localStorage.setItem('patron-input-text', inputText);
+          sessionStorage.setItem('patron-input-text', inputText);
+        } else {
+          localStorage.removeItem('patron-input-text');
+          sessionStorage.removeItem('patron-input-text');
+        }
+        
+        if (formattedInfo) {
+          const formatted = JSON.stringify(formattedInfo);
+          localStorage.setItem('patron-formatted-info', formatted);
+          sessionStorage.setItem('patron-formatted-info', formatted);
+        } else {
+          localStorage.removeItem('patron-formatted-info');
+          sessionStorage.removeItem('patron-formatted-info');
+        }
+      } catch (error) {
+        console.warn('Could not save to localStorage backup:', error);
+      }
+    }
+
+    // If user is authenticated, also save to database
     if (!isAuthenticated || !user) return;
     
     const saveToDatabase = async () => {
@@ -109,7 +217,8 @@ export default function Home() {
         const session = await supabase.auth.getSession();
         if (!session.data.session?.access_token) return;
 
-        await fetch('/api/drafts/save', {
+        console.log('💾 Saving draft to database...');
+        const response = await fetch('/api/drafts/save', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -120,19 +229,26 @@ export default function Home() {
             formattedInfo: formattedInfo || null
           })
         });
+
+        if (response.ok) {
+          console.log('✅ Draft saved to database successfully');
+        } else {
+          console.warn('❌ Failed to save draft to database:', response.status);
+        }
       } catch (error) {
-        console.warn('Could not save draft to database:', error);
+        console.warn('❌ Could not save draft to database:', error);
       }
     };
 
-    // Debounce the save operation to avoid too many API calls
+    // Debounce the database save operation to avoid too many API calls
     const timeoutId = setTimeout(saveToDatabase, 1000);
     return () => clearTimeout(timeoutId);
   }, [inputText, formattedInfo, isAuthenticated, user]);
 
   // Load draft when user becomes authenticated
   useEffect(() => {
-    if (isAuthenticated && user && !inputText && !formattedInfo) {
+    if (isAuthenticated && user) {
+      // Always try to load draft when user authenticates, regardless of current state
       loadDraftFromDatabase();
     }
   }, [isAuthenticated, user]);
@@ -140,13 +256,20 @@ export default function Home() {
   // Handle page visibility changes to restore form data when user returns
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && isAuthenticated && user) {
+      if (!document.hidden) {
         // User returned to the tab, try to restore any lost form data
-        console.log('User returned to tab, checking for saved form data...');
+        console.log('👁️ User returned to tab, checking for saved form data...');
         
-        // Check if current form data exists, if not try to restore from database
+        // Check if current form data exists, if not try to restore
         if (!inputText && !formattedInfo) {
-          loadDraftFromDatabase();
+          console.log('📭 No current form data, attempting restore...');
+          if (isAuthenticated && user) {
+            loadDraftFromDatabase(); // Try database first if authenticated
+          } else {
+            loadFromLocalStorageFallback(); // Use localStorage if not authenticated
+          }
+        } else {
+          console.log('✅ Form data already present, no restore needed');
         }
       }
     };
@@ -638,20 +761,38 @@ export default function Home() {
     setError('');
     setShowCopied(false);
     
+    // Clear persisted form data from localStorage
+    try {
+      localStorage.removeItem('patron-input-text');
+      localStorage.removeItem('patron-formatted-info');
+      sessionStorage.removeItem('patron-input-text');
+      sessionStorage.removeItem('patron-formatted-info');
+      console.log('🧹 Cleared localStorage backup');
+    } catch (error) {
+      console.warn('Could not clear localStorage:', error);
+    }
+    
     // Clear persisted form data from database
     if (isAuthenticated && user) {
       try {
         const session = await supabase.auth.getSession();
         if (session.data.session?.access_token) {
-          await fetch('/api/drafts/clear', {
+          console.log('🧹 Clearing draft from database...');
+          const response = await fetch('/api/drafts/clear', {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${session.data.session.access_token}`
             }
           });
+          
+          if (response.ok) {
+            console.log('✅ Draft cleared from database successfully');
+          } else {
+            console.warn('❌ Failed to clear draft from database:', response.status);
+          }
         }
       } catch (error) {
-        console.warn('Could not clear draft from database:', error);
+        console.warn('❌ Could not clear draft from database:', error);
       }
     }
   };
@@ -1614,7 +1755,7 @@ export default function Home() {
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8 border-t-4 border-green-500">
             <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4 text-blue-800">Add New Sales Lead</h2>
             <p className="text-xs md:text-sm text-black mb-2">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
-            <p className="text-xs text-green-600 mb-3 md:mb-4">🔒 Your form data is automatically saved to your secure account and will be restored across all devices and browsers.</p>
+            <p className="text-xs text-green-600 mb-3 md:mb-4">💾 Your form data is automatically saved both locally and to your secure account - works even when switching tabs or browsers!</p>
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
