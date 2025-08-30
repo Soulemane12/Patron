@@ -456,37 +456,7 @@ export default function Home() {
         if (session?.user) {
           console.log('Valid session found for user:', session.user.email);
 
-          // Check if user is paused
-          try {
-            const { data: userStatus, error: statusError } = await supabase
-              .from('user_status')
-              .select('is_paused')
-              .eq('user_id', session.user.id)
-              .single();
-
-            if (statusError && statusError.code !== 'PGRST116') {
-              // Silently handle missing user_status table (406 errors) - this is expected
-              if (statusError.code !== 'PGRST301' && !statusError.message?.includes('406')) {
-                console.warn('User status check error (non-critical):', statusError.code);
-              }
-            }
-
-            if (userStatus?.is_paused) {
-              // User is paused, redirect to login with message
-              console.log('User account is paused, signing out...');
-              await supabase.auth.signOut();
-              // Clear all local storage to ensure no cached data
-              localStorage.clear();
-              sessionStorage.clear();
-              if (mounted) {
-                router.push('/login?message=account_paused');
-              }
-              return;
-            }
-          } catch (statusError) {
-            console.error('Error checking user status:', statusError);
-            // Don't logout on status check errors, continue with session
-          }
+          // User status checks removed to prevent 406 errors and auth loops
 
           if (mounted) {
             setUser(session.user);
@@ -525,31 +495,7 @@ export default function Home() {
         if (user) {
           console.log('User found:', user.email);
 
-          // Check if user is paused
-          try {
-            const { data: userStatus, error: statusError } = await supabase
-              .from('user_status')
-              .select('is_paused')
-              .eq('user_id', user.id)
-              .single();
-
-            if (statusError && statusError.code !== 'PGRST116') {
-              // Silently handle missing user_status table (406 errors) - this is expected
-              if (statusError.code !== 'PGRST301' && !statusError.message?.includes('406')) {
-                console.warn('User status check error (non-critical):', statusError.code);
-              }
-            }
-
-            if (userStatus?.is_paused) {
-              await supabase.auth.signOut();
-              if (mounted) {
-                router.push('/login?message=account_paused');
-              }
-              return;
-            }
-          } catch (statusError) {
-            console.error('Error checking user status:', statusError);
-          }
+          // User status checks removed to prevent 406 errors and auth loops
 
           if (mounted) {
             setUser(user);
@@ -606,29 +552,7 @@ export default function Home() {
         } else if (event === 'SIGNED_IN' && session?.user) {
           console.log('User signed in:', session.user.email);
           
-          // Check if user is paused on sign in
-          try {
-            const { data: userStatus, error: statusError } = await supabase
-              .from('user_status')
-              .select('is_paused')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            if (statusError && statusError.code !== 'PGRST116') {
-              // Silently handle missing user_status table (406 errors) - this is expected
-              if (statusError.code !== 'PGRST301' && !statusError.message?.includes('406')) {
-                console.warn('User status check error (non-critical):', statusError.code);
-              }
-            }
-            
-            if (userStatus?.is_paused) {
-              await supabase.auth.signOut();
-              router.push('/login?message=account_paused');
-              return;
-            }
-          } catch (statusError) {
-            console.error('Error checking user status on sign in:', statusError);
-          }
+          // User status checks removed to prevent 406 errors and auth loops
           
           setUser(session.user);
           setIsAuthenticated(true);
@@ -847,9 +771,9 @@ export default function Home() {
       try {
         // Add a timeout to prevent infinite hanging
         const savePromise = supabase
-          .from('customers')
-          .insert([customerData])
-          .select();
+        .from('customers')
+        .insert([customerData])
+        .select();
         
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Save operation timed out after 15 seconds')), 15000)
@@ -861,13 +785,13 @@ export default function Home() {
         
         const { data: resultData, error } = result as any;
 
-        if (error) {
-          console.error('Supabase error:', error);
-          throw new Error(`Failed to save customer: ${error.message}`);
-        }
-        
+      if (error) {
+        console.error('Supabase error:', error);
+        throw new Error(`Failed to save customer: ${error.message}`);
+      }
+
         if (!resultData || resultData.length === 0) {
-          throw new Error('No data returned from save operation');
+        throw new Error('No data returned from save operation');
         }
         
         data = resultData;
@@ -891,11 +815,11 @@ export default function Home() {
       
       // Small delay to ensure authentication state stabilizes
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Simple reload - just refresh the customer list
       console.log('Reloading customers...');
       await loadCustomers();
-      
+
       // Always switch to pipeline view after saving
       console.log('Switching to pipeline view...');
       setActiveSection('pipeline');
