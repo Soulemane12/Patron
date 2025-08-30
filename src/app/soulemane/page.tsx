@@ -42,6 +42,7 @@ interface NewCustomerData {
   is_referral: boolean;
   referral_source?: string;
   lead_size: '500MB' | '1GIG' | '2GIG';
+  processed_timestamp?: number;
 }
 
 export default function AdminPage() {
@@ -85,7 +86,11 @@ export default function AdminPage() {
   useEffect(() => {
     if (showAddLeadForm) {
       try {
-        const savedData = localStorage.getItem('patron-processed-customer');
+        // Try multiple storage sources in order of preference
+        const sessionData = sessionStorage.getItem('patron-processed-customer');
+        const localData = localStorage.getItem('patron-processed-customer');
+        const savedData = sessionData || localData;
+        
         if (savedData) {
           const parsedData = JSON.parse(savedData);
           // Only restore if we have actual data and the form is currently empty
@@ -108,6 +113,63 @@ export default function AdminPage() {
       }
     }
   }, [showAddLeadForm, newCustomerData.name]);
+  
+  // Add visibility change listener to handle tab switching
+  useEffect(() => {
+    // Function to handle tab visibility changes
+    const handleVisibilityChange = () => {
+      // When tab becomes visible again
+      if (document.visibilityState === 'visible' && showAddLeadForm) {
+        console.log('Tab became visible, checking for stored data');
+        
+        // Check for cookie that indicates we have processed data
+        const hasCookie = document.cookie.split(';').some(item => item.trim().startsWith('patron-has-processed-data='));
+        
+        if (hasCookie) {
+          try {
+            // Try to restore from session storage first
+            const sessionData = sessionStorage.getItem('patron-processed-customer');
+            const localData = localStorage.getItem('patron-processed-customer');
+            const savedData = sessionData || localData;
+            
+            if (savedData) {
+              const parsedData = JSON.parse(savedData);
+              
+              // If form is empty but we have stored data, restore it
+              if (parsedData && (!newCustomerData.name || !newCustomerData.phone)) {
+                // Update state
+                setProcessedCustomerData(parsedData);
+                
+                // Update form with saved data
+                setNewCustomerData(current => ({
+                  ...current,
+                  name: current.name || parsedData.name || '',
+                  email: current.email || parsedData.email || '',
+                  phone: current.phone || parsedData.phone || '',
+                  service_address: current.service_address || parsedData.service_address || '',
+                  installation_date: current.installation_date || parsedData.installation_date || '',
+                  installation_time: current.installation_time || parsedData.installation_time || ''
+                }));
+                
+                // Show notification to user
+                alert('Your processed customer data has been restored.');
+              }
+            }
+          } catch (error) {
+            console.error('Error restoring data on visibility change:', error);
+          }
+        }
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Clean up
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [showAddLeadForm, newCustomerData]);
   const [customerInputText, setCustomerInputText] = useState('');
   const [isFormattingCustomer, setIsFormattingCustomer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -257,7 +319,8 @@ export default function AdminPage() {
         phone: data.phone || '',
         service_address: data.serviceAddress || '',
         installation_date: data.installationDate || '',
-        installation_time: data.installationTime || ''
+        installation_time: data.installationTime || '',
+        processed_timestamp: new Date().getTime() // Add timestamp for freshness check
       };
       
       // Update the form with formatted data
@@ -266,8 +329,26 @@ export default function AdminPage() {
       // Also store in a separate state variable for persistence
       setProcessedCustomerData(formattedData);
       
-      // Save to localStorage as a backup
-      localStorage.setItem('patron-processed-customer', JSON.stringify(formattedData));
+      // Save to multiple storage mechanisms for redundancy
+      try {
+        // Save to localStorage (persists across browser sessions)
+        localStorage.setItem('patron-processed-customer', JSON.stringify(formattedData));
+        
+        // Save to sessionStorage (persists only for current tab session)
+        sessionStorage.setItem('patron-processed-customer', JSON.stringify(formattedData));
+        
+        // Store the raw input text as well in case we need to reprocess
+        localStorage.setItem('patron-customer-input-text', customerInputText);
+        sessionStorage.setItem('patron-customer-input-text', customerInputText);
+        
+        // Set a cookie as another fallback (30 minute expiration)
+        document.cookie = `patron-has-processed-data=true; max-age=${30*60}; path=/; SameSite=Strict`;
+      } catch (storageError) {
+        console.error('Error saving customer data to storage:', storageError);
+      }
+      
+      // Show success message to confirm data is saved
+      alert('Customer information processed and saved. You can now add this customer to the pipeline.');
       
     } catch (error) {
       console.error('Error formatting customer info:', error);
@@ -284,32 +365,80 @@ export default function AdminPage() {
     let dataToSubmit = {...newCustomerData};
     let dataRestored = false;
     
-    // If the form is missing critical data but we have processed data, use that instead
-    if ((!dataToSubmit.name || !dataToSubmit.email || !dataToSubmit.phone) && processedCustomerData) {
-      dataToSubmit = {...processedCustomerData, user_id: dataToSubmit.user_id};
-      console.log('Restored data from processedCustomerData state');
-      dataRestored = true;
+    // Function to check if data is missing critical fields
+    const isMissingCriticalData = (data: NewCustomerData) => {
+      return !data.name || !data.email || !data.phone || !data.service_address || 
+             !data.installation_date || !data.installation_time;
+    };
+    
+    // Check if current form data is incomplete
+    const needsRestoration = isMissingCriticalData(dataToSubmit);
+    
+    // Try multiple data restoration approaches in sequence
+    if (needsRestoration) {
+      // 1. First try in-memory state
+      if (processedCustomerData) {
+        dataToSubmit = {...processedCustomerData, user_id: dataToSubmit.user_id};
+        console.log('Restored data from processedCustomerData state');
+        dataRestored = true;
+      }
       
-      // Update the form fields to show the restored data to the user
-      setNewCustomerData({...dataToSubmit});
-    }
-    // If still missing data, try to restore from localStorage
-    else if ((!dataToSubmit.name || !dataToSubmit.email || !dataToSubmit.phone)) {
-      try {
-        const savedData = localStorage.getItem('patron-processed-customer');
-        if (savedData) {
-          const parsedData = JSON.parse(savedData);
-          dataToSubmit = {...parsedData, user_id: dataToSubmit.user_id};
-          console.log('Restored data from localStorage');
-          dataRestored = true;
-          
-          // Update the form fields to show the restored data to the user
-          setNewCustomerData({...dataToSubmit});
-          // Also update the processed data state
-          setProcessedCustomerData(parsedData);
+      // 2. If still missing data or no state, try sessionStorage (tab-specific)
+      if (!dataRestored || isMissingCriticalData(dataToSubmit)) {
+        try {
+          const sessionData = sessionStorage.getItem('patron-processed-customer');
+          if (sessionData) {
+            const parsedData = JSON.parse(sessionData);
+            dataToSubmit = {...parsedData, user_id: dataToSubmit.user_id};
+            console.log('Restored data from sessionStorage');
+            dataRestored = true;
+          }
+        } catch (error) {
+          console.error('Error parsing session storage data:', error);
         }
-      } catch (error) {
-        console.error('Error parsing saved customer data:', error);
+      }
+      
+      // 3. If still missing data, try localStorage (browser-wide)
+      if (!dataRestored || isMissingCriticalData(dataToSubmit)) {
+        try {
+          const savedData = localStorage.getItem('patron-processed-customer');
+          if (savedData) {
+            const parsedData = JSON.parse(savedData);
+            dataToSubmit = {...parsedData, user_id: dataToSubmit.user_id};
+            console.log('Restored data from localStorage');
+            dataRestored = true;
+          }
+        } catch (error) {
+          console.error('Error parsing localStorage data:', error);
+        }
+      }
+      
+      // 4. If we have the original input text, try to reprocess it as last resort
+      if ((!dataRestored || isMissingCriticalData(dataToSubmit)) && 
+          (localStorage.getItem('patron-customer-input-text') || sessionStorage.getItem('patron-customer-input-text'))) {
+        
+        const savedText = localStorage.getItem('patron-customer-input-text') || 
+                          sessionStorage.getItem('patron-customer-input-text');
+        
+        if (savedText && savedText.trim() && !isFormattingCustomer) {
+          // Ask user if they want to reprocess
+          if (confirm('Your processed customer data may have been lost. Would you like to reprocess the customer information?')) {
+            // Set the text back in the input field
+            setCustomerInputText(savedText);
+            // Trigger the formatting process again
+            await formatCustomerInfo();
+            // Abort current submission - they'll need to submit again after reprocessing
+            return;
+          }
+        }
+      }
+      
+      // If we restored data, update the UI to show it
+      if (dataRestored) {
+        // Update the form fields to show the restored data to the user
+        setNewCustomerData({...dataToSubmit});
+        // Also update the processed data state
+        setProcessedCustomerData(dataToSubmit);
       }
     }
     
@@ -319,9 +448,7 @@ export default function AdminPage() {
     }
 
     // Validate that we have the required fields
-    if (!dataToSubmit.name || !dataToSubmit.phone || !dataToSubmit.service_address || 
-        !dataToSubmit.installation_date || !dataToSubmit.installation_time) {
-      
+    if (isMissingCriticalData(dataToSubmit)) {
       // If we couldn't restore data and the form is incomplete
       if (!dataRestored) {
         alert('Missing required customer information. Please process the lead again or fill in the fields manually.');
@@ -331,6 +458,19 @@ export default function AdminPage() {
       // If we restored data but it's still incomplete, ask for confirmation
       if (!confirm('Some customer information may be incomplete. Do you want to continue adding this customer?')) {
         return;
+      }
+    }
+    
+    // Check for stale data (older than 30 minutes)
+    if (dataToSubmit.processed_timestamp) {
+      const currentTime = new Date().getTime();
+      const dataAge = currentTime - dataToSubmit.processed_timestamp;
+      const thirtyMinutesInMs = 30 * 60 * 1000;
+      
+      if (dataAge > thirtyMinutesInMs) {
+        if (!confirm('The processed customer data is more than 30 minutes old. Do you still want to use it?')) {
+          return;
+        }
       }
     }
 
@@ -364,8 +504,26 @@ export default function AdminPage() {
         lead_size: '2GIG'
       });
       setCustomerInputText('');
+      
+      // Clear all stored data to prevent stale information
       setProcessedCustomerData(null);
-      localStorage.removeItem('patron-processed-customer');
+      
+      // Clear all storage mechanisms
+      try {
+        // Clear localStorage items
+        localStorage.removeItem('patron-processed-customer');
+        localStorage.removeItem('patron-customer-input-text');
+        
+        // Clear sessionStorage items
+        sessionStorage.removeItem('patron-processed-customer');
+        sessionStorage.removeItem('patron-customer-input-text');
+        
+        // Clear cookie
+        document.cookie = 'patron-has-processed-data=; max-age=0; path=/; SameSite=Strict';
+      } catch (error) {
+        console.error('Error clearing stored customer data:', error);
+      }
+      
       setShowAddLeadForm(false);
       setJustAddedLead(true);
       loadAllData();
