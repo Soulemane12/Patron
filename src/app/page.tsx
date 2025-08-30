@@ -827,20 +827,45 @@ export default function Home() {
 
       console.log('Inserting customer data:', customerData);
 
-      // Simple, direct save - no complex retries
+      // Simple, direct save with timeout and detailed logging
       console.log('Saving customer...');
-      const { data, error } = await supabase
-        .from('customers')
-        .insert([customerData])
-        .select();
+      
+      let data: any;
+      
+      try {
+        // Add a timeout to prevent infinite hanging
+        const savePromise = supabase
+          .from('customers')
+          .insert([customerData])
+          .select();
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Save operation timed out after 15 seconds')), 15000)
+        );
+        
+        console.log('📡 Making database request...');
+        const result = await Promise.race([savePromise, timeoutPromise]);
+        console.log('📡 Database request completed:', result);
+        
+        const { data: resultData, error } = result as any;
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw new Error(`Failed to save customer: ${error.message}`);
-      }
-
-      if (!data || data.length === 0) {
-        throw new Error('No data returned from save operation');
+        if (error) {
+          console.error('Supabase error:', error);
+          throw new Error(`Failed to save customer: ${error.message}`);
+        }
+        
+        if (!resultData || resultData.length === 0) {
+          throw new Error('No data returned from save operation');
+        }
+        
+        data = resultData;
+        
+      } catch (dbError: any) {
+        console.error('Database operation failed:', dbError);
+        if (dbError.message?.includes('timed out')) {
+          throw new Error('Save operation timed out. Please check your internet connection and try again.');
+        }
+        throw dbError;
       }
 
       console.log('Customer saved successfully:', data[0]);
