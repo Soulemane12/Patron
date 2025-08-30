@@ -874,15 +874,15 @@ export default function Home() {
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 3000);
 
-      // Clear the form
-      clearForm();
-
+      // Clear the form and reload customers
+      await clearForm();
+      
+      // Small delay to ensure authentication state stabilizes
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Simple reload - just refresh the customer list
       console.log('Reloading customers...');
       await loadCustomers();
-
-      // Clear form data after successful save
-      await clearForm();
       
       // Always switch to pipeline view after saving
       console.log('Switching to pipeline view...');
