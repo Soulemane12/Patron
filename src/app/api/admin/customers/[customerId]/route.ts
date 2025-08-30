@@ -23,34 +23,31 @@ export async function PUT(
       }
     }
 
-    // Update the customer using admin client (bypasses RLS)
-    const { data, error } = await supabaseAdmin
-      .from('customers')
-      .update({
-        name: customerData.name,
-        email: customerData.email,
-        phone: customerData.phone,
-        service_address: customerData.service_address,
-        installation_date: customerData.installation_date,
-        installation_time: customerData.installation_time,
-        status: customerData.status || 'active',
-        is_referral: customerData.is_referral || false,
-        referral_source: customerData.is_referral ? customerData.referral_source : null,
-        lead_size: customerData.lead_size || '2GIG',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', customerId)
-      .select();
+    // Use the stored procedure to update the customer (more efficient)
+    const { data, error } = await supabaseAdmin.rpc('update_customer', {
+      p_customer_id: customerId,
+      p_name: customerData.name,
+      p_email: customerData.email,
+      p_phone: customerData.phone,
+      p_service_address: customerData.service_address,
+      p_installation_date: customerData.installation_date,
+      p_installation_time: customerData.installation_time,
+      p_status: customerData.status || 'active',
+      p_is_referral: customerData.is_referral || false,
+      p_referral_source: customerData.is_referral ? customerData.referral_source : null,
+      p_lead_size: customerData.lead_size || '2GIG',
+    });
 
     if (error) {
       console.error('Error updating customer:', error);
       return NextResponse.json({ error: 'Failed to update customer' }, { status: 500 });
     }
 
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
+    // The stored procedure returns the updated customer
     return NextResponse.json({ success: true, customer: data[0] });
 
   } catch (error) {
@@ -72,15 +69,18 @@ export async function DELETE(
 
     const { customerId } = await params;
 
-    // Delete the customer using admin client (bypasses RLS)
-    const { error } = await supabaseAdmin
-      .from('customers')
-      .delete()
-      .eq('id', customerId);
+    // Use the stored procedure to delete the customer (more efficient)
+    const { data: success, error } = await supabaseAdmin.rpc('delete_customer', {
+      p_customer_id: customerId
+    });
 
     if (error) {
       console.error('Error deleting customer:', error);
       return NextResponse.json({ error: 'Failed to delete customer' }, { status: 500 });
+    }
+
+    if (!success) {
+      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });

@@ -19,29 +19,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert the customer using admin client (bypasses RLS)
-    const { data, error } = await supabaseAdmin
-      .from('customers')
-      .insert([{
-        user_id: customerData.user_id,
-        name: customerData.name,
-        email: customerData.email,
-        phone: customerData.phone,
-        service_address: customerData.service_address,
-        installation_date: customerData.installation_date,
-        installation_time: customerData.installation_time,
-        status: customerData.status || 'active',
-        is_referral: customerData.is_referral || false,
-        referral_source: customerData.is_referral ? customerData.referral_source : null,
-        lead_size: customerData.lead_size || '2GIG',
-      }])
-      .select();
+    // Use the stored procedure to add the customer (more efficient)
+    const { data, error } = await supabaseAdmin.rpc('add_customer', {
+      p_user_id: customerData.user_id,
+      p_name: customerData.name,
+      p_email: customerData.email,
+      p_phone: customerData.phone,
+      p_service_address: customerData.service_address,
+      p_installation_date: customerData.installation_date,
+      p_installation_time: customerData.installation_time,
+      p_status: customerData.status || 'active',
+      p_is_referral: customerData.is_referral || false,
+      p_referral_source: customerData.is_referral ? customerData.referral_source : null,
+      p_lead_size: customerData.lead_size || '2GIG',
+    });
 
     if (error) {
       console.error('Error adding customer:', error);
       return NextResponse.json({ error: 'Failed to add customer' }, { status: 500 });
     }
 
+    // The stored procedure returns the newly created customer
     return NextResponse.json({ success: true, customer: data[0] });
 
   } catch (error) {
