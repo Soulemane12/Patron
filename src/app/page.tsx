@@ -98,6 +98,7 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
+  const [isManualSaving, setIsManualSaving] = useState(false); // Lock to prevent auto-save interference
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fallback function to load from localStorage
@@ -221,7 +222,8 @@ export default function Home() {
     lastSavedData.current = { inputText, formattedInfo };
 
     // If user is authenticated, also save to database
-    if (!isAuthenticated || !user) return;
+    // BUT NOT if a manual save operation is in progress (prevents interference)
+    if (!isAuthenticated || !user || isManualSaving) return;
     
     const saveToDatabase = async () => {
       try {
@@ -251,7 +253,7 @@ export default function Home() {
     // Debounce the database save operation to avoid too many API calls
     const timeoutId = setTimeout(saveToDatabase, 2000);
     return () => clearTimeout(timeoutId);
-  }, [inputText, formattedInfo, isAuthenticated, user]);
+  }, [inputText, formattedInfo, isAuthenticated, user, isManualSaving]);
 
   // Load draft when user becomes authenticated (only once per session)
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -463,7 +465,10 @@ export default function Home() {
               .single();
 
             if (statusError && statusError.code !== 'PGRST116') {
-              console.error('User status check error:', statusError);
+              // Silently handle missing user_status table (406 errors) - this is expected
+              if (statusError.code !== 'PGRST301' && !statusError.message?.includes('406')) {
+                console.warn('User status check error (non-critical):', statusError.code);
+              }
             }
 
             if (userStatus?.is_paused) {
@@ -529,7 +534,10 @@ export default function Home() {
               .single();
 
             if (statusError && statusError.code !== 'PGRST116') {
-              console.error('User status check error:', statusError);
+              // Silently handle missing user_status table (406 errors) - this is expected
+              if (statusError.code !== 'PGRST301' && !statusError.message?.includes('406')) {
+                console.warn('User status check error (non-critical):', statusError.code);
+              }
             }
 
             if (userStatus?.is_paused) {
@@ -607,7 +615,10 @@ export default function Home() {
               .single();
             
             if (statusError && statusError.code !== 'PGRST116') {
-              console.error('User status check error:', statusError);
+              // Silently handle missing user_status table (406 errors) - this is expected
+              if (statusError.code !== 'PGRST301' && !statusError.message?.includes('406')) {
+                console.warn('User status check error (non-critical):', statusError.code);
+              }
             }
             
             if (userStatus?.is_paused) {
@@ -802,6 +813,7 @@ export default function Home() {
     }
 
     setIsSaving(true);
+    setIsManualSaving(true); // Lock auto-save to prevent interference
     setSaveProgress('');
     setError(''); // Clear any previous errors
     
@@ -908,8 +920,9 @@ export default function Home() {
         setError('An unexpected error occurred while saving the customer.');
       }
     } finally {
-      // Ensure isSaving is always set to false
+      // Ensure isSaving is always set to false and release the manual save lock
       setIsSaving(false);
+      setIsManualSaving(false); // Release auto-save lock
       setSaveProgress('');
       console.log('Save operation finalized');
     }
