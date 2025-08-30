@@ -334,26 +334,7 @@ export default function Home() {
 
     window.addEventListener('storage', handleStorageChange);
 
-    // Use Supabase's auth state listener for immediate auth detection
-    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
-      
-      if (event === 'SIGNED_IN' && session && mounted) {
-        console.log('User signed in via auth state listener');
-        setUser(session.user);
-        setIsAuthenticated(true);
-        setIsLoadingAuth(false);
-        return;
-      }
-      
-      if (event === 'SIGNED_OUT' && mounted) {
-        console.log('User signed out via auth state listener');
-        setUser(null);
-        setIsAuthenticated(false);
-        setIsLoadingAuth(false);
-        return;
-      }
-    });
+    // Consolidated auth state listener will be set up below
     
     // Add shorter timeout to prevent infinite loading on mobile
     const loadingTimeout = setTimeout(() => {
@@ -441,7 +422,7 @@ export default function Home() {
     // Faster auth check with timeout handling
     const checkAuth = async () => {
       try {
-        console.log('Checking authentication...');
+        // Checking authentication silently
 
         // Get current session with increased timeout for mobile
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -607,7 +588,7 @@ export default function Home() {
       async (event, session) => {
         if (!mounted) return;
 
-        console.log('Auth state change:', event, session?.user?.email);
+        // Auth state change: ${event} - ${session?.user?.email}
 
         if (event === 'SIGNED_OUT') {
           console.log('User signed out');
@@ -707,7 +688,6 @@ export default function Home() {
       }
       clearInterval(sessionRefreshInterval);
       subscription.unsubscribe();
-      authSubscription.unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [router, isAuthenticated, user, lastActivity]);
@@ -931,14 +911,14 @@ export default function Home() {
     deleteCustomer(customerId);
   };
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     if (!user || !isAuthenticated) {
       console.log('No user available or not authenticated, skipping loadCustomers');
       return;
     }
     
     try {
-      console.log('Loading customers for user:', user.id);
+      // Loading customers for user: ${user.id}
       
       const { data, error } = await supabase
         .from('customers')
@@ -970,7 +950,7 @@ export default function Home() {
       console.error('Error loading customers:', error);
       // Don't throw here, just log the error to prevent breaking the UI
     }
-  };
+  }, [user, isAuthenticated]);
 
   const deleteCustomer = async (id: string) => {
     try {
@@ -1261,11 +1241,16 @@ export default function Home() {
   };
 
   // Load customers when user is authenticated
+  // Load customers once when user becomes authenticated
+  const [customersLoaded, setCustomersLoaded] = useState(false);
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && !customersLoaded) {
       loadCustomers();
+      setCustomersLoaded(true);
+    } else if (!isAuthenticated) {
+      setCustomersLoaded(false);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, customersLoaded]);
 
   // Initial filtering when customers are loaded
   useEffect(() => {
