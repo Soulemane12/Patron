@@ -51,14 +51,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Check authentication on component mount
-  useEffect(() => {
-    const authStatus = localStorage.getItem('adminAuthenticated');
-    if (authStatus === 'true') {
-      setIsAuthenticated(true);
-      // Don't load data automatically
-    }
-  }, []);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [customers, setCustomers] = useState<AdminCustomer[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -79,11 +71,49 @@ export default function AdminPage() {
     referral_source: '',
     lead_size: '2GIG'
   });
+  
+  // Check authentication on component mount
+  useEffect(() => {
+    const authStatus = localStorage.getItem('adminAuthenticated');
+    if (authStatus === 'true') {
+      setIsAuthenticated(true);
+      // Don't load data automatically
+    }
+  }, []);
+  
+  // Effect to check for any saved customer data when the form is opened
+  useEffect(() => {
+    if (showAddLeadForm) {
+      try {
+        const savedData = localStorage.getItem('patron-processed-customer');
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          // Only restore if we have actual data and the form is currently empty
+          if (parsedData && !newCustomerData.name) {
+            setProcessedCustomerData(parsedData);
+            // Only update form fields that are empty
+            setNewCustomerData(current => ({
+              ...current,
+              name: current.name || parsedData.name || '',
+              email: current.email || parsedData.email || '',
+              phone: current.phone || parsedData.phone || '',
+              service_address: current.service_address || parsedData.service_address || '',
+              installation_date: current.installation_date || parsedData.installation_date || '',
+              installation_time: current.installation_time || parsedData.installation_time || ''
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading saved customer data:', error);
+      }
+    }
+  }, [showAddLeadForm, newCustomerData.name]);
   const [customerInputText, setCustomerInputText] = useState('');
   const [isFormattingCustomer, setIsFormattingCustomer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [justAddedLead, setJustAddedLead] = useState(false);
+  const [processedCustomerData, setProcessedCustomerData] = useState<any>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,8 +249,8 @@ export default function AdminPage() {
 
       const data = await response.json();
       
-      // Update the form with formatted data
-      setNewCustomerData({
+      // Store the processed data in both state variables
+      const formattedData = {
         ...newCustomerData,
         name: data.name || '',
         email: data.email || '',
@@ -228,7 +258,16 @@ export default function AdminPage() {
         service_address: data.serviceAddress || '',
         installation_date: data.installationDate || '',
         installation_time: data.installationTime || ''
-      });
+      };
+      
+      // Update the form with formatted data
+      setNewCustomerData(formattedData);
+      
+      // Also store in a separate state variable for persistence
+      setProcessedCustomerData(formattedData);
+      
+      // Save to localStorage as a backup
+      localStorage.setItem('patron-processed-customer', JSON.stringify(formattedData));
       
     } catch (error) {
       console.error('Error formatting customer info:', error);
@@ -240,9 +279,59 @@ export default function AdminPage() {
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCustomerData.user_id) {
+    
+    // First check if we need to restore data from localStorage
+    let dataToSubmit = {...newCustomerData};
+    let dataRestored = false;
+    
+    // If the form is missing critical data but we have processed data, use that instead
+    if ((!dataToSubmit.name || !dataToSubmit.email || !dataToSubmit.phone) && processedCustomerData) {
+      dataToSubmit = {...processedCustomerData, user_id: dataToSubmit.user_id};
+      console.log('Restored data from processedCustomerData state');
+      dataRestored = true;
+      
+      // Update the form fields to show the restored data to the user
+      setNewCustomerData({...dataToSubmit});
+    }
+    // If still missing data, try to restore from localStorage
+    else if ((!dataToSubmit.name || !dataToSubmit.email || !dataToSubmit.phone)) {
+      try {
+        const savedData = localStorage.getItem('patron-processed-customer');
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          dataToSubmit = {...parsedData, user_id: dataToSubmit.user_id};
+          console.log('Restored data from localStorage');
+          dataRestored = true;
+          
+          // Update the form fields to show the restored data to the user
+          setNewCustomerData({...dataToSubmit});
+          // Also update the processed data state
+          setProcessedCustomerData(parsedData);
+        }
+      } catch (error) {
+        console.error('Error parsing saved customer data:', error);
+      }
+    }
+    
+    if (!dataToSubmit.user_id) {
       alert('Please select a user');
       return;
+    }
+
+    // Validate that we have the required fields
+    if (!dataToSubmit.name || !dataToSubmit.phone || !dataToSubmit.service_address || 
+        !dataToSubmit.installation_date || !dataToSubmit.installation_time) {
+      
+      // If we couldn't restore data and the form is incomplete
+      if (!dataRestored) {
+        alert('Missing required customer information. Please process the lead again or fill in the fields manually.');
+        return;
+      }
+      
+      // If we restored data but it's still incomplete, ask for confirmation
+      if (!confirm('Some customer information may be incomplete. Do you want to continue adding this customer?')) {
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -253,7 +342,7 @@ export default function AdminPage() {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer soulemane'
         },
-        body: JSON.stringify(newCustomerData)
+        body: JSON.stringify(dataToSubmit)
       });
 
       if (!response.ok) {
@@ -275,6 +364,8 @@ export default function AdminPage() {
         lead_size: '2GIG'
       });
       setCustomerInputText('');
+      setProcessedCustomerData(null);
+      localStorage.removeItem('patron-processed-customer');
       setShowAddLeadForm(false);
       setJustAddedLead(true);
       loadAllData();
