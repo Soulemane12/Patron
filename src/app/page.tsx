@@ -100,8 +100,40 @@ export default function Home() {
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Fallback function to load from localStorage
+  const loadFromLocalStorageFallback = useCallback(() => {
+    console.log('🔄 Trying localStorage fallback...');
+    
+    try {
+      if (typeof window !== 'undefined') {
+        const savedInputText = localStorage.getItem('patron-input-text') || 
+                             sessionStorage.getItem('patron-input-text');
+        const savedFormattedInfo = localStorage.getItem('patron-formatted-info') || 
+                                 sessionStorage.getItem('patron-formatted-info');
+        
+        if (savedInputText && !inputText) {
+          setInputText(savedInputText);
+          console.log('📝 Restored input text from localStorage');
+        }
+        
+        if (savedFormattedInfo && !formattedInfo) {
+          setFormattedInfo(JSON.parse(savedFormattedInfo));
+          console.log('📋 Restored formatted info from localStorage');
+        }
+        
+        if (savedInputText || savedFormattedInfo) {
+          console.log('✅ Successfully loaded from localStorage fallback');
+        } else {
+          console.log('📭 No saved data found in localStorage either');
+        }
+      }
+    } catch (error) {
+      console.warn('❌ localStorage fallback also failed:', error);
+    }
+  }, [inputText, formattedInfo]);
+
   // Load draft data from database when user authenticates
-  const loadDraftFromDatabase = async () => {
+  const loadDraftFromDatabase = useCallback(async () => {
     console.log('🔄 Attempting to load draft from database...');
     
     try {
@@ -149,42 +181,18 @@ export default function Home() {
     
     // Fallback to localStorage if database fails
     loadFromLocalStorageFallback();
-  };
-
-  // Fallback function to load from localStorage
-  const loadFromLocalStorageFallback = () => {
-    console.log('🔄 Trying localStorage fallback...');
-    
-    try {
-      if (typeof window !== 'undefined') {
-        const savedInputText = localStorage.getItem('patron-input-text') || 
-                             sessionStorage.getItem('patron-input-text');
-        const savedFormattedInfo = localStorage.getItem('patron-formatted-info') || 
-                                 sessionStorage.getItem('patron-formatted-info');
-        
-        if (savedInputText && !inputText) {
-          setInputText(savedInputText);
-          console.log('📝 Restored input text from localStorage');
-        }
-        
-        if (savedFormattedInfo && !formattedInfo) {
-          setFormattedInfo(JSON.parse(savedFormattedInfo));
-          console.log('📋 Restored formatted info from localStorage');
-        }
-        
-        if (savedInputText || savedFormattedInfo) {
-          console.log('✅ Successfully loaded from localStorage fallback');
-        } else {
-          console.log('📭 No saved data found in localStorage either');
-        }
-      }
-    } catch (error) {
-      console.warn('❌ localStorage fallback also failed:', error);
-    }
-  };
+  }, [loadFromLocalStorageFallback]);
 
   // Auto-save input text to database whenever it changes
+  const lastSavedData = useRef<{ inputText: string; formattedInfo: CustomerInfo | null }>({ inputText: '', formattedInfo: null });
   useEffect(() => {
+    // Only save if data actually changed
+    const dataChanged = 
+      lastSavedData.current.inputText !== inputText ||
+      JSON.stringify(lastSavedData.current.formattedInfo) !== JSON.stringify(formattedInfo);
+    
+    if (!dataChanged) return;
+
     // Always save to localStorage immediately for instant backup
     if (typeof window !== 'undefined') {
       try {
@@ -209,6 +217,9 @@ export default function Home() {
       }
     }
 
+    // Update the ref
+    lastSavedData.current = { inputText, formattedInfo };
+
     // If user is authenticated, also save to database
     if (!isAuthenticated || !user) return;
     
@@ -217,7 +228,6 @@ export default function Home() {
         const session = await supabase.auth.getSession();
         if (!session.data.session?.access_token) return;
 
-        console.log('💾 Saving draft to database...');
         const response = await fetch('/api/drafts/save', {
           method: 'POST',
           headers: {
@@ -230,9 +240,7 @@ export default function Home() {
           })
         });
 
-        if (response.ok) {
-          console.log('✅ Draft saved to database successfully');
-        } else {
+        if (!response.ok) {
           console.warn('❌ Failed to save draft to database:', response.status);
         }
       } catch (error) {
@@ -241,17 +249,19 @@ export default function Home() {
     };
 
     // Debounce the database save operation to avoid too many API calls
-    const timeoutId = setTimeout(saveToDatabase, 1000);
+    const timeoutId = setTimeout(saveToDatabase, 2000);
     return () => clearTimeout(timeoutId);
   }, [inputText, formattedInfo, isAuthenticated, user]);
 
-  // Load draft when user becomes authenticated
+  // Load draft when user becomes authenticated (only once per session)
+  const [draftLoaded, setDraftLoaded] = useState(false);
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && !draftLoaded) {
       // Always try to load draft when user authenticates, regardless of current state
       loadDraftFromDatabase();
+      setDraftLoaded(true);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, draftLoaded, loadDraftFromDatabase]);
 
   // Handle page visibility changes to restore form data when user returns
   useEffect(() => {
@@ -280,7 +290,7 @@ export default function Home() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [inputText, formattedInfo, isAuthenticated, user]);
+  }, [inputText, formattedInfo, isAuthenticated, user, loadDraftFromDatabase, loadFromLocalStorageFallback]);
 
   // Track user activity to prevent automatic logouts
   useEffect(() => {

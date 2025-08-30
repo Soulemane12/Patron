@@ -148,7 +148,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'implicit', // Change to implicit for better mobile support
-    debug: true, // Enable debug to help diagnose mobile issues
+    debug: false, // Disable debug to reduce console noise
     storage: mobileStorage
   },
   // Add global error handler and timeout
