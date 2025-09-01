@@ -94,6 +94,7 @@ export default function Home() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [filterBy, setFilterBy] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [gigSizeFilter, setGigSizeFilter] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
@@ -1029,7 +1030,7 @@ export default function Home() {
   };
 
   // Filter and sort customers based on search term, filter, and sort options
-  const filterAndSortCustomers = useCallback((term: string, filter: string, sort: string, order: 'asc' | 'desc', location: string = 'all') => {
+  const filterAndSortCustomers = useCallback((term: string, filter: string, sort: string, order: 'asc' | 'desc', location: string = 'all', gigSize: string = 'all') => {
     let filtered = [...customers];
     
     // Apply search filter
@@ -1101,6 +1102,11 @@ export default function Home() {
         return customerLocation === location;
       });
     }
+
+    // Apply gig size filter
+    if (gigSize !== 'all') {
+      filtered = filtered.filter(customer => customer.lead_size === gigSize);
+    }
     
     // Apply sorting
     filtered.sort((a, b) => {
@@ -1164,7 +1170,7 @@ export default function Home() {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
+      filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter, gigSizeFilter);
     }, 300); // 300ms debounce
 
     return () => {
@@ -1178,28 +1184,35 @@ export default function Home() {
   const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSortBy = e.target.value;
     setSortBy(newSortBy);
-    filterAndSortCustomers(searchTerm, filterBy, newSortBy, sortOrder, locationFilter);
+    filterAndSortCustomers(searchTerm, filterBy, newSortBy, sortOrder, locationFilter, gigSizeFilter);
   };
 
   // Handle sort order toggle
   const toggleSortOrder = () => {
     const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
     setSortOrder(newOrder);
-    filterAndSortCustomers(searchTerm, filterBy, sortBy, newOrder, locationFilter);
+    filterAndSortCustomers(searchTerm, filterBy, sortBy, newOrder, locationFilter, gigSizeFilter);
   };
 
   // Handle filter change
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newFilter = e.target.value;
     setFilterBy(newFilter);
-    filterAndSortCustomers(searchTerm, newFilter, sortBy, sortOrder, locationFilter);
+    filterAndSortCustomers(searchTerm, newFilter, sortBy, sortOrder, locationFilter, gigSizeFilter);
   };
 
   // Handle location filter change
   const handleLocationFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newLocation = e.target.value;
     setLocationFilter(newLocation);
-    filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, newLocation);
+    filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, newLocation, gigSizeFilter);
+  };
+
+  // Handle gig size filter change
+  const handleGigSizeFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newGigSize = e.target.value;
+    setGigSizeFilter(newGigSize);
+    filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter, newGigSize);
   };
 
   // Load customers when user is authenticated
@@ -1223,7 +1236,7 @@ export default function Home() {
         searchTerm,
         customersWithStatus: customers.map(c => ({ name: c.name, status: c.status }))
       });
-      filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter);
+      filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter, gigSizeFilter);
     } else {
       // If no customers, set filtered to empty array
       setFilteredCustomers([]);
@@ -1359,6 +1372,21 @@ export default function Home() {
                   {getUniqueLocations().map((location) => (
                     <option key={location} value={location}>{location}</option>
                   ))}
+                </select>
+              </div>
+
+              {/* Gig Size Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-black">Gig Size:</label>
+                <select 
+                  value={gigSizeFilter}
+                  onChange={handleGigSizeFilterChange}
+                  className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Sizes</option>
+                  <option value="500MB">500MB</option>
+                  <option value="1GIG">1GIG</option>
+                  <option value="2GIG">2GIG</option>
                 </select>
               </div>
 
