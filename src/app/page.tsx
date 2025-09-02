@@ -26,8 +26,38 @@ export default function Home() {
   const router = useRouter();
   // Parse a YYYY-MM-DD string as a local-timezone date (avoids UTC shift)
   const parseDateLocal = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
-  const [inputText, setInputText] = useState<string>('');
-  const [formattedInfo, setFormattedInfo] = useState<CustomerInfo | null>(null);
+  const [inputText, setInputText] = useState(() => {
+    // Try to restore input text from localStorage immediately on page load
+    if (typeof window !== 'undefined') {
+      try {
+        const savedInputText = localStorage.getItem('patron-input-text') || 
+                             sessionStorage.getItem('patron-input-text');
+        if (savedInputText) {
+          console.log('🔄 Restored input text from localStorage on page load');
+          return savedInputText;
+        }
+      } catch (error) {
+        console.warn('Could not load saved input text:', error);
+      }
+    }
+    return '';
+  });
+  const [formattedInfo, setFormattedInfo] = useState<CustomerInfo | null>(() => {
+    // Try to restore formatted info from localStorage immediately on page load
+    if (typeof window !== 'undefined') {
+      try {
+        const savedFormattedInfo = localStorage.getItem('patron-formatted-info') || 
+                                 sessionStorage.getItem('patron-formatted-info');
+        if (savedFormattedInfo) {
+          console.log('🔄 Restored formatted info from localStorage on page load');
+          return JSON.parse(savedFormattedInfo);
+        }
+      } catch (error) {
+        console.warn('Could not load saved formatted info:', error);
+      }
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCopied, setShowCopied] = useState(false);
@@ -43,7 +73,21 @@ export default function Home() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedDateInstallations, setSelectedDateInstallations] = useState<Customer[]>([]);
-  const [activeSection, setActiveSection] = useState<string>('pipeline');
+  const [activeSection, setActiveSection] = useState<string>(() => {
+    // Try to get the last active section from localStorage on page load
+    if (typeof window !== 'undefined') {
+      try {
+        const savedSection = localStorage.getItem('patron-active-section');
+        // Only return saved section if it's valid, otherwise default to pipeline
+        if (savedSection && ['pipeline', 'calendar', 'add', 'stats'].includes(savedSection)) {
+          return savedSection;
+        }
+      } catch (error) {
+        console.warn('Could not load saved section:', error);
+      }
+    }
+    return 'pipeline'; // Default fallback
+  });
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [sortBy, setSortBy] = useState<string>('created_at');
@@ -57,47 +101,6 @@ export default function Home() {
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
   const [isManualSaving, setIsManualSaving] = useState(false); // Lock to prevent auto-save interference
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // Load localStorage data after component mounts to prevent hydration mismatch
-  useEffect(() => {
-    setIsHydrated(true);
-    
-    // Load input text from localStorage
-    try {
-      const savedInputText = localStorage.getItem('patron-input-text') || 
-                           sessionStorage.getItem('patron-input-text');
-      if (savedInputText) {
-        setInputText(savedInputText);
-        console.log('🔄 Restored input text from localStorage');
-      }
-    } catch (error) {
-      console.warn('Could not load saved input text:', error);
-    }
-
-    // Load formatted info from localStorage
-    try {
-      const savedFormattedInfo = localStorage.getItem('patron-formatted-info') || 
-                               sessionStorage.getItem('patron-formatted-info');
-      if (savedFormattedInfo) {
-        setFormattedInfo(JSON.parse(savedFormattedInfo));
-        console.log('🔄 Restored formatted info from localStorage');
-      }
-    } catch (error) {
-      console.warn('Could not load saved formatted info:', error);
-    }
-
-    // Load active section from localStorage
-    try {
-      const savedSection = localStorage.getItem('patron-active-section');
-      if (savedSection && ['pipeline', 'calendar', 'add', 'stats'].includes(savedSection)) {
-        setActiveSection(savedSection);
-        console.log('🔄 Restored active section from localStorage');
-      }
-    } catch (error) {
-      console.warn('Could not load saved section:', error);
-    }
-  }, []); // Empty dependency array - only run once after mount
 
   // Fallback function to load from localStorage
   const loadFromLocalStorageFallback = useCallback(() => {
@@ -1253,25 +1256,13 @@ export default function Home() {
   }
 
   // Show login redirect if not authenticated
-  if (!isAuthenticated && !isLoadingAuth && isHydrated) {
+  if (!isAuthenticated && !isLoadingAuth) {
     // Force direct navigation to login for more reliability
     console.log('Not authenticated, redirecting to login...');
     window.location.href = '/login';
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 flex flex-col items-center justify-center">
         <div className="text-blue-600 text-sm font-medium">Redirecting to login...</div>
-      </div>
-    );
-  }
-
-  // Don't render anything until hydration is complete to prevent mismatch
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 flex flex-col items-center justify-center">
-        <div className="mb-3">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-        </div>
-        <div className="text-blue-600 text-sm font-medium">Loading...</div>
       </div>
     );
   }
