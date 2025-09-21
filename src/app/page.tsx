@@ -97,6 +97,7 @@ export default function Home() {
   const [gigSizeFilter, setGigSizeFilter] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [calendarStatusFilter, setCalendarStatusFilter] = useState<string>('all');
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
   const [isManualSaving, setIsManualSaving] = useState(false); // Lock to prevent auto-save interference
@@ -874,6 +875,21 @@ export default function Home() {
     deleteCustomer(customerId);
   };
 
+  // Function to switch to calendar view with status filtering
+  const switchToCalendarWithFilter = (statusFilter: string) => {
+    setCalendarStatusFilter(statusFilter);
+    setActiveSection('calendar');
+
+    // Save the new active section to localStorage
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('patron-active-section', 'calendar');
+      }
+    } catch (error) {
+      console.warn('Could not save active section:', error);
+    }
+  };
+
   // Function to automatically update customer statuses based on installation date
   const updateExpiredCustomersStatus = useCallback(async (customers: Customer[]) => {
     if (!user || !isAuthenticated) return customers;
@@ -1342,15 +1358,60 @@ export default function Home() {
         {activeSection === 'calendar' && (
           <div className="mb-8">
             <div className="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500">
-              <h2 className="text-xl font-semibold mb-4 text-blue-800">Installation Calendar</h2>
-              {customers.length > 0 ? (
-                <InstallationCalendar 
-                  customers={customers} 
-                  onDateClick={handleDateClick} 
-                />
-              ) : (
-                <p className="text-center py-8 text-black">No installations scheduled yet. Add some leads to see them on the calendar.</p>
-              )}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-blue-800">Installation Calendar</h2>
+                {calendarStatusFilter !== 'all' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Filtered by:</span>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                      {calendarStatusFilter === 'in_progress' ? 'Missed Installation' :
+                       calendarStatusFilter === 'not_paid' ? 'Not Paid' :
+                       calendarStatusFilter.charAt(0).toUpperCase() + calendarStatusFilter.slice(1)}
+                    </span>
+                    <button
+                      onClick={() => setCalendarStatusFilter('all')}
+                      className="text-blue-600 hover:text-blue-800 text-sm underline"
+                    >
+                      Clear filter
+                    </button>
+                  </div>
+                )}
+              </div>
+              {(() => {
+                // Filter customers based on status filter
+                const filteredCalendarCustomers = calendarStatusFilter === 'all'
+                  ? customers
+                  : customers.filter(customer => {
+                      if (calendarStatusFilter === 'active') {
+                        return customer.status === 'active' || customer.status === undefined;
+                      }
+                      return customer.status === calendarStatusFilter;
+                    });
+
+                return filteredCalendarCustomers.length > 0 ? (
+                  <InstallationCalendar
+                    customers={filteredCalendarCustomers}
+                    onDateClick={handleDateClick}
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-black">
+                      {calendarStatusFilter === 'all'
+                        ? "No installations scheduled yet. Add some leads to see them on the calendar."
+                        : `No customers with status "${calendarStatusFilter === 'in_progress' ? 'Missed Installation' : calendarStatusFilter === 'not_paid' ? 'Not Paid' : calendarStatusFilter}" found.`
+                      }
+                    </p>
+                    {calendarStatusFilter !== 'all' && (
+                      <button
+                        onClick={() => setCalendarStatusFilter('all')}
+                        className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                      >
+                        Show All Customers
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             
             {selectedDate && (
@@ -1785,7 +1846,10 @@ export default function Home() {
 
         {/* Stats Section */}
         {activeSection === 'stats' && (
-          <StatsPage customers={customers} />
+          <StatsPage
+            customers={customers}
+            onSwitchToCalendar={switchToCalendarWithFilter}
+          />
         )}
 
         {/* Add New Lead Section */}

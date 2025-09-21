@@ -5,6 +5,7 @@ import { Customer } from '../../lib/supabase';
 
 interface StatsPageProps {
   customers: Customer[];
+  onSwitchToCalendar?: (statusFilter: string) => void;
 }
 
 interface MonthlyStats {
@@ -12,7 +13,7 @@ interface MonthlyStats {
   count: number;
 }
 
-export default function StatsPage({ customers }: StatsPageProps) {
+export default function StatsPage({ customers, onSwitchToCalendar }: StatsPageProps) {
   const [totalCustomers, setTotalCustomers] = useState<number>(0);
   const [upcomingInstallations, setUpcomingInstallations] = useState<number>(0);
   const [pastInstallations, setPastInstallations] = useState<number>(0);
@@ -316,17 +317,25 @@ export default function StatsPage({ customers }: StatsPageProps) {
           role="button"
           tabIndex={0}
           onClick={() => {
-            const list = customers.filter(c => c.status === 'in_progress');
-            setModalCustomers(list);
-            setModalTitle(`Missed Installation Customers (${list.length})`);
-            setIsModalOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (onSwitchToCalendar) {
+              onSwitchToCalendar('in_progress');
+            } else {
               const list = customers.filter(c => c.status === 'in_progress');
               setModalCustomers(list);
               setModalTitle(`Missed Installation Customers (${list.length})`);
               setIsModalOpen(true);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (onSwitchToCalendar) {
+                onSwitchToCalendar('in_progress');
+              } else {
+                const list = customers.filter(c => c.status === 'in_progress');
+                setModalCustomers(list);
+                setModalTitle(`Missed Installation Customers (${list.length})`);
+                setIsModalOpen(true);
+              }
             }
           }}
         >
@@ -339,17 +348,25 @@ export default function StatsPage({ customers }: StatsPageProps) {
           role="button"
           tabIndex={0}
           onClick={() => {
-            const list = customers.filter(c => c.status === 'not_paid');
-            setModalCustomers(list);
-            setModalTitle(`Not Paid Customers (${list.length})`);
-            setIsModalOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (onSwitchToCalendar) {
+              onSwitchToCalendar('not_paid');
+            } else {
               const list = customers.filter(c => c.status === 'not_paid');
               setModalCustomers(list);
               setModalTitle(`Not Paid Customers (${list.length})`);
               setIsModalOpen(true);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (onSwitchToCalendar) {
+                onSwitchToCalendar('not_paid');
+              } else {
+                const list = customers.filter(c => c.status === 'not_paid');
+                setModalCustomers(list);
+                setModalTitle(`Not Paid Customers (${list.length})`);
+                setIsModalOpen(true);
+              }
             }
           }}
         >
@@ -362,17 +379,25 @@ export default function StatsPage({ customers }: StatsPageProps) {
           role="button"
           tabIndex={0}
           onClick={() => {
-            const list = customers.filter(c => c.status === 'paid');
-            setModalCustomers(list);
-            setModalTitle(`Paid Customers (${list.length})`);
-            setIsModalOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (onSwitchToCalendar) {
+              onSwitchToCalendar('paid');
+            } else {
               const list = customers.filter(c => c.status === 'paid');
               setModalCustomers(list);
               setModalTitle(`Paid Customers (${list.length})`);
               setIsModalOpen(true);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (onSwitchToCalendar) {
+                onSwitchToCalendar('paid');
+              } else {
+                const list = customers.filter(c => c.status === 'paid');
+                setModalCustomers(list);
+                setModalTitle(`Paid Customers (${list.length})`);
+                setIsModalOpen(true);
+              }
             }
           }}
         >
