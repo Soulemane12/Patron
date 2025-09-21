@@ -410,17 +410,25 @@ export default function StatsPage({ customers, onSwitchToCalendar }: StatsPagePr
           role="button"
           tabIndex={0}
           onClick={() => {
-            const list = customers.filter(c => c.status === 'cancelled');
-            setModalCustomers(list);
-            setModalTitle(`Cancelled Customers (${list.length})`);
-            setIsModalOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (onSwitchToCalendar) {
+              onSwitchToCalendar('cancelled');
+            } else {
               const list = customers.filter(c => c.status === 'cancelled');
               setModalCustomers(list);
               setModalTitle(`Cancelled Customers (${list.length})`);
               setIsModalOpen(true);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (onSwitchToCalendar) {
+                onSwitchToCalendar('cancelled');
+              } else {
+                const list = customers.filter(c => c.status === 'cancelled');
+                setModalCustomers(list);
+                setModalTitle(`Cancelled Customers (${list.length})`);
+                setIsModalOpen(true);
+              }
             }
           }}
         >
@@ -673,17 +681,25 @@ export default function StatsPage({ customers, onSwitchToCalendar }: StatsPagePr
           role="button"
           tabIndex={0}
           onClick={() => {
-            const list = customers.filter(c => c.status === 'active' || c.status === undefined);
-            setModalCustomers(list);
-            setModalTitle(`Active Customers (${list.length})`);
-            setIsModalOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (onSwitchToCalendar) {
+              onSwitchToCalendar('active');
+            } else {
               const list = customers.filter(c => c.status === 'active' || c.status === undefined);
               setModalCustomers(list);
               setModalTitle(`Active Customers (${list.length})`);
               setIsModalOpen(true);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (onSwitchToCalendar) {
+                onSwitchToCalendar('active');
+              } else {
+                const list = customers.filter(c => c.status === 'active' || c.status === undefined);
+                setModalCustomers(list);
+                setModalTitle(`Active Customers (${list.length})`);
+                setIsModalOpen(true);
+              }
             }
           }}
         >
@@ -705,17 +721,25 @@ export default function StatsPage({ customers, onSwitchToCalendar }: StatsPagePr
           role="button"
           tabIndex={0}
           onClick={() => {
-            const list = customers.filter(c => c.status === 'in_progress');
-            setModalCustomers(list);
-            setModalTitle(`Missed Installation Customers (${list.length})`);
-            setIsModalOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (onSwitchToCalendar) {
+              onSwitchToCalendar('in_progress');
+            } else {
               const list = customers.filter(c => c.status === 'in_progress');
               setModalCustomers(list);
               setModalTitle(`Missed Installation Customers (${list.length})`);
               setIsModalOpen(true);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              if (onSwitchToCalendar) {
+                onSwitchToCalendar('in_progress');
+              } else {
+                const list = customers.filter(c => c.status === 'in_progress');
+                setModalCustomers(list);
+                setModalTitle(`Missed Installation Customers (${list.length})`);
+                setIsModalOpen(true);
+              }
             }
           }}
         >
