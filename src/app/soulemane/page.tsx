@@ -22,7 +22,7 @@ interface AdminCustomer {
   service_address: string;
   installation_date: string;
   installation_time: string;
-  status?: 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid';
+  status?: 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress';
   is_referral?: boolean;
   referral_source?: string;
   lead_size?: '500MB' | '1GIG' | '2GIG';
@@ -38,7 +38,7 @@ interface NewCustomerData {
   service_address: string;
   installation_date: string;
   installation_time: string;
-  status: 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid';
+  status: 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress';
   is_referral: boolean;
   referral_source?: string;
   lead_size: '500MB' | '1GIG' | '2GIG';
@@ -567,6 +567,7 @@ export default function AdminPage() {
                         className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="active">Active</option>
+                        <option value="in_progress">Missed Installation</option>
                         <option value="completed">Completed</option>
                         <option value="not_paid">Not Paid</option>
                         <option value="paid">Paid</option>
@@ -763,6 +764,8 @@ export default function AdminPage() {
                                <span className={`px-2 py-1 text-xs rounded-full ${
                                  customer.status === 'active' || customer.status === undefined
                                    ? 'bg-green-100 text-green-800'
+                                   : customer.status === 'in_progress'
+                                   ? 'bg-yellow-100 text-yellow-800'
                                    : customer.status === 'cancelled'
                                    ? 'bg-red-100 text-red-800'
                                    : customer.status === 'paid'
@@ -771,7 +774,7 @@ export default function AdminPage() {
                                    ? 'bg-orange-100 text-orange-800'
                                    : 'bg-blue-100 text-blue-800'
                                }`}>
-                                 {customer.status === 'not_paid' ? 'Not Paid' : customer.status || 'active'}
+                                 {customer.status === 'not_paid' ? 'Not Paid' : customer.status === 'in_progress' ? 'Missed Installation' : customer.status || 'active'}
                                </span>
                              </td>
                             <td className="px-4 py-3 text-sm text-gray-900">{customer.lead_size || '2GIG'}</td>
@@ -879,6 +882,7 @@ export default function AdminPage() {
                         className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="active">Active</option>
+                        <option value="in_progress">Missed Installation</option>
                         <option value="completed">Completed</option>
                         <option value="not_paid">Not Paid</option>
                         <option value="paid">Paid</option>

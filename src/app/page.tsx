@@ -874,6 +874,50 @@ export default function Home() {
     deleteCustomer(customerId);
   };
 
+  // Function to automatically update customer statuses based on installation date
+  const updateExpiredCustomersStatus = useCallback(async (customers: Customer[]) => {
+    if (!user || !isAuthenticated) return customers;
+
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+
+    const updatedCustomers = [];
+
+    for (const customer of customers) {
+      // Check if installation date has passed and customer is not already in completed status
+      if (customer.installation_date < todayString &&
+          customer.status !== 'completed' &&
+          customer.status !== 'not_paid' &&
+          customer.status !== 'paid' &&
+          customer.status !== 'cancelled') {
+
+        try {
+          // Update customer status to 'not_paid' in database
+          const { error } = await supabase
+            .from('customers')
+            .update({ status: 'not_paid' })
+            .eq('id', customer.id)
+            .eq('user_id', user.id);
+
+          if (error) {
+            console.error('Error updating customer status:', error);
+            updatedCustomers.push(customer);
+          } else {
+            console.log(`Updated customer ${customer.name} status to not_paid (installation date passed)`);
+            updatedCustomers.push({ ...customer, status: 'not_paid' as const });
+          }
+        } catch (error) {
+          console.error('Error updating customer status:', error);
+          updatedCustomers.push(customer);
+        }
+      } else {
+        updatedCustomers.push(customer);
+      }
+    }
+
+    return updatedCustomers;
+  }, [user, isAuthenticated, supabase]);
+
   const loadCustomers = useCallback(async () => {
     if (!user || !isAuthenticated) {
       console.log('No user available or not authenticated, skipping loadCustomers');
@@ -894,9 +938,12 @@ export default function Home() {
         throw error;
       }
       
-      const loadedCustomers = data || [];
+      let loadedCustomers = data || [];
       console.log(`Loaded ${loadedCustomers.length} customers`);
-      
+
+      // Automatically update statuses for customers whose installation date has passed
+      loadedCustomers = await updateExpiredCustomersStatus(loadedCustomers);
+
       // Debug logging to check actual status values
       console.log('Loaded customers with statuses:', loadedCustomers.map(c => ({
         name: c.name,
@@ -904,7 +951,7 @@ export default function Home() {
         installation_date: c.installation_date,
         created_at: c.created_at
       })));
-      
+
       // Update both states
       setCustomers(loadedCustomers);
       // Don't set filteredCustomers here - it will be handled by the debounced search effect
@@ -913,7 +960,7 @@ export default function Home() {
       console.error('Error loading customers:', error);
       // Don't throw here, just log the error to prevent breaking the UI
     }
-  }, [user, isAuthenticated]);
+  }, [user, isAuthenticated, updateExpiredCustomersStatus]);
 
   const deleteCustomer = async (id: string) => {
     try {
@@ -1053,6 +1100,8 @@ export default function Home() {
     // Status filters
     if (filter === 'active') {
       filtered = filtered.filter(customer => customer.status === 'active' || customer.status === undefined);
+    } else if (filter === 'in_progress') {
+      filtered = filtered.filter(customer => customer.status === 'in_progress');
     } else if (filter === 'cancelled') {
       filtered = filtered.filter(customer => customer.status === 'cancelled');
     } else if (filter === 'completed') {
@@ -1130,8 +1179,8 @@ export default function Home() {
           bValue = b.email.toLowerCase();
           break;
         case 'status':
-          // Define an order for statuses: cancelled first, then completed, then not_paid, then paid, then active
-          const statusOrder = { 'cancelled': 1, 'completed': 2, 'not_paid': 3, 'paid': 4, 'active': 5, 'undefined': 6 };
+          // Define an order for statuses: cancelled first, then completed, then not_paid, then paid, then in_progress, then active
+          const statusOrder = { 'cancelled': 1, 'completed': 2, 'not_paid': 3, 'paid': 4, 'in_progress': 5, 'active': 6, 'undefined': 7 };
           aValue = statusOrder[a.status || 'undefined'];
           bValue = statusOrder[b.status || 'undefined'];
           break;
@@ -1347,7 +1396,8 @@ export default function Home() {
                   className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Customers</option>
-              <option value="active">In Progress Customers</option>
+              <option value="active">Active Customers</option>
+                  <option value="in_progress">Missed Installation Customers</option>
                   <option value="cancelled">Cancelled Customers</option>
                   <option value="completed">Completed Installations</option>
                   <option value="not_paid">Completed - Not Paid</option>
@@ -1447,11 +1497,12 @@ export default function Home() {
                                 value={editingCustomer.status || 'active'}
                                 onChange={(e) => setEditingCustomer({ 
                                   ...editingCustomer, 
-                                  status: e.target.value as 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' 
+                                  status: e.target.value as 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress' 
                                 })}
                                 className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
                               >
-                <option value="active">In Progress</option>
+                <option value="active">Active</option>
+                                <option value="in_progress">Missed Installation</option>
                                 <option value="cancelled">Cancelled</option>
                                 <option value="completed">Completed</option>
                                 <option value="not_paid">Completed - Not Paid</option>
@@ -1596,8 +1647,10 @@ export default function Home() {
                               <div className="flex gap-1">
                                 {customer.status && (
                                   <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                    customer.status === 'active' 
-                                      ? 'bg-green-100 text-green-800' 
+                                    customer.status === 'active'
+                                      ? 'bg-green-100 text-green-800'
+                                      : customer.status === 'in_progress'
+                                      ? 'bg-yellow-100 text-yellow-800'
                                       : customer.status === 'cancelled'
                                       ? 'bg-red-100 text-red-800'
                                       : customer.status === 'paid'
@@ -1608,7 +1661,7 @@ export default function Home() {
                                       ? 'bg-blue-100 text-blue-800'
                                       : 'bg-gray-100 text-gray-800'
                                   }`}>
-                                    {customer.status === 'not_paid' ? 'Not Paid' : customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                                    {customer.status === 'not_paid' ? 'Not Paid' : customer.status === 'in_progress' ? 'Missed Installation' : customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
                                   </span>
                                 )}
                                 {customer.is_referral && (

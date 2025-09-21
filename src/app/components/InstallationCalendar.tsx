@@ -43,37 +43,102 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
     }
   };
 
-  // Custom tile content to show number of installations
+  // Get the color for a status that matches the analytics colors
+  const getStatusColor = (status: string | undefined) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-500';
+      case 'in_progress':
+        return 'bg-yellow-500';
+      case 'cancelled':
+        return 'bg-red-500';
+      case 'paid':
+        return 'bg-purple-500';
+      case 'not_paid':
+        return 'bg-orange-500';
+      case 'completed':
+        return 'bg-blue-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  // Custom tile content to show number of installations with status colors
   const tileContent = ({ date, view }: { date: Date; view: string }) => {
     if (view !== 'month') return null;
-    
+
     const formattedDate = format(date, 'yyyy-MM-dd');
     const installationsOnDate = installationsByDate[formattedDate] || [];
-    
+
     if (installationsOnDate.length > 0) {
-      return (
-        <div className="flex items-center justify-center">
-          <div className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mt-1">
-            {installationsOnDate.length}
+      // Group by status to show different colored dots
+      const statusGroups = installationsOnDate.reduce((acc, customer) => {
+        const status = customer.status || 'active';
+        if (!acc[status]) acc[status] = 0;
+        acc[status]++;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const statusEntries = Object.entries(statusGroups);
+
+      if (statusEntries.length === 1) {
+        // Single status - show one dot with count
+        const [status, count] = statusEntries[0];
+        return (
+          <div className="flex items-center justify-center">
+            <div className={`${getStatusColor(status)} text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mt-1`}>
+              {count}
+            </div>
           </div>
-        </div>
-      );
+        );
+      } else {
+        // Multiple statuses - show multiple smaller dots
+        return (
+          <div className="flex items-center justify-center flex-wrap gap-0.5 mt-1">
+            {statusEntries.slice(0, 3).map(([status, count], index) => (
+              <div
+                key={status}
+                className={`${getStatusColor(status)} text-white rounded-full w-3 h-3 flex items-center justify-center text-xs`}
+                title={`${status}: ${count}`}
+              >
+                {count}
+              </div>
+            ))}
+            {statusEntries.length > 3 && (
+              <div className="bg-gray-400 text-white rounded-full w-3 h-3 flex items-center justify-center text-xs">
+                +
+              </div>
+            )}
+          </div>
+        );
+      }
     }
-    
+
     return null;
   };
 
   // Custom tile class to highlight dates with installations
   const tileClassName = ({ date, view }: { date: Date; view: string }) => {
     if (view !== 'month') return '';
-    
+
     const formattedDate = format(date, 'yyyy-MM-dd');
     const installationsOnDate = installationsByDate[formattedDate] || [];
-    
+
     if (installationsOnDate.length > 0) {
-      return 'has-installations';
+      // Get the most common status for background color
+      const statusCounts = installationsOnDate.reduce((acc, customer) => {
+        const status = customer.status || 'active';
+        if (!acc[status]) acc[status] = 0;
+        acc[status]++;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const primaryStatus = Object.entries(statusCounts)
+        .sort(([,a], [,b]) => b - a)[0][0];
+
+      return `has-installations status-${primaryStatus}`;
     }
-    
+
     return '';
   };
 
@@ -111,9 +176,26 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
           color: black;
         }
         .has-installations {
-          background-color: #f0f9ff;
           font-weight: bold;
           color: black;
+        }
+        .status-active {
+          background-color: #dcfce7; /* green-100 */
+        }
+        .status-in_progress {
+          background-color: #fef3c7; /* yellow-100 */
+        }
+        .status-cancelled {
+          background-color: #fee2e2; /* red-100 */
+        }
+        .status-paid {
+          background-color: #f3e8ff; /* purple-100 */
+        }
+        .status-not_paid {
+          background-color: #fed7aa; /* orange-100 */
+        }
+        .status-completed {
+          background-color: #dbeafe; /* blue-100 */
         }
         .react-calendar__tile:hover {
           background-color: #e0e7ff;

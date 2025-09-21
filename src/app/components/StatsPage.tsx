@@ -18,6 +18,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
   const [pastInstallations, setPastInstallations] = useState<number>(0);
   const [thisMonthInstallations, setThisMonthInstallations] = useState<number>(0);
   const [activeCustomers, setActiveCustomers] = useState<number>(0);
+  const [inProgressCustomers, setInProgressCustomers] = useState<number>(0);
   const [cancelledCustomers, setCancelledCustomers] = useState<number>(0);
   const [completedCustomers, setCompletedCustomers] = useState<number>(0);
   const [notPaidCustomers, setNotPaidCustomers] = useState<number>(0);
@@ -61,7 +62,10 @@ export default function StatsPage({ customers }: StatsPageProps) {
     // Status statistics
     const active = customers.filter(c => c.status === 'active' || c.status === undefined);
     setActiveCustomers(active.length);
-    
+
+    const inProgress = customers.filter(c => c.status === 'in_progress');
+    setInProgressCustomers(inProgress.length);
+
     const cancelled = customers.filter(c => c.status === 'cancelled');
     setCancelledCustomers(cancelled.length);
     
@@ -175,7 +179,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
       <h2 className="text-lg md:text-xl font-semibold mb-4 text-blue-800">Sales Analytics</h2>
       
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-6">
         {/* Total Customers */}
         <div
           className="bg-blue-50 p-4 rounded-lg text-center cursor-pointer"
@@ -305,6 +309,29 @@ export default function StatsPage({ customers }: StatsPageProps) {
         >
           <p className="text-sm text-black">Total Referrals</p>
           <p className="text-2xl font-bold text-pink-700">{referralCustomers}</p>
+        </div>
+        {/* Missed Installation Customers */}
+        <div
+          className="bg-yellow-50 p-4 rounded-lg text-center cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.status === 'in_progress');
+            setModalCustomers(list);
+            setModalTitle(`Missed Installation Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.status === 'in_progress');
+              setModalCustomers(list);
+              setModalTitle(`Missed Installation Customers (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
+          <p className="text-sm text-black">Missed Installation Customers</p>
+          <p className="text-2xl font-bold text-yellow-700">{inProgressCustomers}</p>
         </div>
         {/* Not Paid Customers */}
         <div
@@ -615,7 +642,7 @@ export default function StatsPage({ customers }: StatsPageProps) {
       <div className="mt-6 bg-gray-50 p-4 rounded-lg">
         <h3 className="text-md font-semibold mb-3 text-black">Customer Status Breakdown</h3>
         
-        {/* In Progress Customers */}
+        {/* Active Customers */}
         <div
           className="mb-3 cursor-pointer"
           role="button"
@@ -623,26 +650,58 @@ export default function StatsPage({ customers }: StatsPageProps) {
           onClick={() => {
             const list = customers.filter(c => c.status === 'active' || c.status === undefined);
             setModalCustomers(list);
-            setModalTitle(`In Progress Customers (${list.length})`);
+            setModalTitle(`Active Customers (${list.length})`);
             setIsModalOpen(true);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               const list = customers.filter(c => c.status === 'active' || c.status === undefined);
               setModalCustomers(list);
-              setModalTitle(`In Progress Customers (${list.length})`);
+              setModalTitle(`Active Customers (${list.length})`);
               setIsModalOpen(true);
             }
           }}
         >
           <div className="flex justify-between mb-1">
-            <span className="text-sm font-medium text-black">In Progress Customers</span>
+            <span className="text-sm font-medium text-black">Active Customers</span>
             <span className="text-sm font-medium text-black">{activeCustomers} ({totalCustomers > 0 ? Math.round((activeCustomers / totalCustomers) * 100) : 0}%)</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div 
-              className="bg-green-600 h-2.5 rounded-full" 
+            <div
+              className="bg-green-600 h-2.5 rounded-full"
               style={{ width: `${totalCustomers > 0 ? (activeCustomers / totalCustomers) * 100 : 0}%` }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Missed Installation Customers */}
+        <div
+          className="mb-3 cursor-pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const list = customers.filter(c => c.status === 'in_progress');
+            setModalCustomers(list);
+            setModalTitle(`Missed Installation Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              const list = customers.filter(c => c.status === 'in_progress');
+              setModalCustomers(list);
+              setModalTitle(`Missed Installation Customers (${list.length})`);
+              setIsModalOpen(true);
+            }
+          }}
+        >
+          <div className="flex justify-between mb-1">
+            <span className="text-sm font-medium text-black">Missed Installation Customers</span>
+            <span className="text-sm font-medium text-black">{inProgressCustomers} ({totalCustomers > 0 ? Math.round((inProgressCustomers / totalCustomers) * 100) : 0}%)</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+              className="bg-yellow-600 h-2.5 rounded-full"
+              style={{ width: `${totalCustomers > 0 ? (inProgressCustomers / totalCustomers) * 100 : 0}%` }}
             ></div>
           </div>
         </div>

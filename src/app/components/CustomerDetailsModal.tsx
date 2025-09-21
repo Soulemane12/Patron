@@ -63,13 +63,21 @@ export default function CustomerDetailsModal({
               <div className="flex gap-2">
                 {customer.status && (
                   <span className={`text-sm px-3 py-1 rounded-full ${
-                    customer.status === 'active' 
-                      ? 'bg-green-100 text-green-800' 
+                    customer.status === 'active'
+                      ? 'bg-green-100 text-green-800'
+                      : customer.status === 'in_progress'
+                      ? 'bg-yellow-100 text-yellow-800'
                       : customer.status === 'cancelled'
                       ? 'bg-red-100 text-red-800'
-                      : 'bg-blue-100 text-blue-800'
+                      : customer.status === 'paid'
+                      ? 'bg-purple-100 text-purple-800'
+                      : customer.status === 'not_paid'
+                      ? 'bg-orange-100 text-orange-800'
+                      : customer.status === 'completed'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                    {customer.status === 'not_paid' ? 'Not Paid' : customer.status === 'in_progress' ? 'Missed Installation' : customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
                   </span>
                 )}
                 {customer.is_referral && (
