@@ -19,7 +19,6 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [leadSizeFilter, setLeadSizeFilter] = useState<string>('all');
   const [referralFilter, setReferralFilter] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState<boolean>(false);
 
   // Filter customers based on selected filters
   const filteredCustomers = useMemo(() => {
@@ -149,122 +148,68 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
 
   return (
     <div className="installation-calendar">
-      {/* Filter Section */}
-      <div className="mb-4 bg-white rounded-lg shadow-sm border p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-gray-800">Calendar Filters</h3>
-          <div className="flex items-center gap-3">
-            {activeFilterCount > 0 && (
-              <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active
-              </span>
-            )}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-            >
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </button>
-          </div>
+      {/* Filter Controls */}
+      <div className="mb-4 flex flex-wrap gap-3 items-center">
+        {/* Status Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-black">Filter:</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="in_progress">Missed Installation</option>
+            <option value="completed">Completed</option>
+            <option value="not_paid">Not Paid</option>
+            <option value="paid">Paid</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
         </div>
 
-        {showFilters && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="in_progress">Missed Installation</option>
-                  <option value="completed">Completed</option>
-                  <option value="not_paid">Not Paid</option>
-                  <option value="paid">Paid</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
+        {/* Lead Size Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-black">Lead Size:</label>
+          <select
+            value={leadSizeFilter}
+            onChange={(e) => setLeadSizeFilter(e.target.value)}
+            className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Sizes</option>
+            <option value="500MB">500MB</option>
+            <option value="1GIG">1GIG</option>
+            <option value="2GIG">2GIG</option>
+          </select>
+        </div>
 
-              {/* Lead Size Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Lead Size</label>
-                <select
-                  value={leadSizeFilter}
-                  onChange={(e) => setLeadSizeFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">All Sizes</option>
-                  <option value="500MB">500MB</option>
-                  <option value="1GIG">1GIG</option>
-                  <option value="2GIG">2GIG</option>
-                </select>
-              </div>
+        {/* Referral Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-black">Referral:</label>
+          <select
+            value={referralFilter}
+            onChange={(e) => setReferralFilter(e.target.value)}
+            className="p-1 text-sm text-black border border-gray-300 rounded bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Customers</option>
+            <option value="referral">Referrals Only</option>
+            <option value="non_referral">Non-Referrals Only</option>
+          </select>
+        </div>
 
-              {/* Referral Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Referral Status</label>
-                <select
-                  value={referralFilter}
-                  onChange={(e) => setReferralFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">All Customers</option>
-                  <option value="referral">Referrals Only</option>
-                  <option value="non_referral">Non-Referrals Only</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Clear Filters Button */}
-            <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-              <div className="text-sm text-gray-600">
-                Showing {filteredCustomers.length} of {customers.length} customers
-              </div>
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={clearFilters}
-                  className="text-sm px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-md transition-colors"
-                >
-                  Clear All Filters
-                </button>
-              )}
-            </div>
-          </div>
+        {/* Clear Filters Button */}
+        {activeFilterCount > 0 && (
+          <button
+            onClick={clearFilters}
+            className="text-sm px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-md transition-colors"
+          >
+            Clear Filters
+          </button>
         )}
-      </div>
 
-      {/* Color Legend */}
-      <div className="mb-4 bg-white rounded-lg shadow-sm border p-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Calendar Color Legend</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded border-l-4 border-green-600 bg-green-100"></div>
-            <span>Active</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded border-l-4 border-amber-600 bg-amber-100"></div>
-            <span>Missed Installation</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded border-l-4 border-blue-600 bg-blue-100"></div>
-            <span>Completed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded border-l-4 border-orange-600 bg-orange-100"></div>
-            <span>Not Paid</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded border-l-4 border-purple-600 bg-purple-100"></div>
-            <span>Paid</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded border-l-4 border-red-600 bg-red-100"></div>
-            <span>Cancelled</span>
-          </div>
+        {/* Customer Count */}
+        <div className="ml-auto text-sm text-gray-600">
+          Showing {filteredCustomers.length} of {customers.length} customers
         </div>
       </div>
 
