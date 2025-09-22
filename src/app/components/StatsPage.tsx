@@ -379,25 +379,17 @@ export default function StatsPage({ customers, onSwitchToCalendar }: StatsPagePr
           role="button"
           tabIndex={0}
           onClick={() => {
-            if (onSwitchToCalendar) {
-              onSwitchToCalendar('paid');
-            } else {
+            const list = customers.filter(c => c.status === 'paid');
+            setModalCustomers(list);
+            setModalTitle(`Paid Customers (${list.length})`);
+            setIsModalOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
               const list = customers.filter(c => c.status === 'paid');
               setModalCustomers(list);
               setModalTitle(`Paid Customers (${list.length})`);
               setIsModalOpen(true);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              if (onSwitchToCalendar) {
-                onSwitchToCalendar('paid');
-              } else {
-                const list = customers.filter(c => c.status === 'paid');
-                setModalCustomers(list);
-                setModalTitle(`Paid Customers (${list.length})`);
-                setIsModalOpen(true);
-              }
             }
           }}
         >
