@@ -121,11 +121,9 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
         case 'in_progress':
           return 'has-installations has-missed';
         case 'completed':
-          return 'has-installations has-completed';
         case 'not_paid':
-          return 'has-installations has-not-paid';
         case 'paid':
-          return 'has-installations has-paid';
+          return 'has-installations has-completed';
         case 'cancelled':
           return 'has-installations has-cancelled';
         default:
