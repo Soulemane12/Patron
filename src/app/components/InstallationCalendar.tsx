@@ -20,6 +20,7 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
   const [leadSizeFilter, setLeadSizeFilter] = useState<string>('all');
   const [referralFilter, setReferralFilter] = useState<string>('all');
 
+
   // Filter customers based on selected filters
   const filteredCustomers = useMemo(() => {
     return customers.filter(customer => {
