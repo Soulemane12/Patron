@@ -1121,7 +1121,7 @@ export default function Home() {
     } else if (filter === 'cancelled') {
       filtered = filtered.filter(customer => customer.status === 'cancelled');
     } else if (filter === 'completed') {
-      filtered = filtered.filter(customer => customer.status === 'completed');
+      filtered = filtered.filter(customer => customer.status === 'completed' || customer.status === 'not_paid' || customer.status === 'paid');
     } else if (filter === 'not_paid') {
       filtered = filtered.filter(customer => customer.status === 'not_paid');
     } else if (filter === 'paid') {
