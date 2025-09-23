@@ -28,7 +28,9 @@ export default function InstallationCalendar({ customers, onDateClick }: Install
       if (statusFilter !== 'all') {
         if (statusFilter === 'active' && !(customer.status === 'active' || customer.status === undefined)) {
           return false;
-        } else if (statusFilter !== 'active' && customer.status !== statusFilter) {
+        } else if (statusFilter === 'completed' && !(customer.status === 'completed' || customer.status === 'not_paid' || customer.status === 'paid')) {
+          return false;
+        } else if (statusFilter !== 'active' && statusFilter !== 'completed' && customer.status !== statusFilter) {
           return false;
         }
       }
