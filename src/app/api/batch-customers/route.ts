@@ -165,8 +165,33 @@ function parseBatchText(batchText: string): CustomerInfo[] {
         installationTime = '10:00 AM'; // Default time
       }
 
-      // Validate required fields
-      if (name && email && phone) {
+      // Ensure we have at least some data - be more lenient
+      if (!name && parts.length > 0) name = parts[0];
+      if (!email && parts.length > 1) {
+        // Look for email-like pattern in any part
+        for (const part of parts) {
+          if (part.includes('@')) {
+            email = part;
+            break;
+          }
+        }
+        // If still no email, create a placeholder
+        if (!email) email = `customer${i + 1}@example.com`;
+      }
+      if (!phone && parts.length > 2) {
+        // Look for phone-like pattern in any part
+        for (const part of parts) {
+          if (/[\d\-\(\)\.\s]{10,}/.test(part) && /\d{3}/.test(part)) {
+            phone = part;
+            break;
+          }
+        }
+        // If still no phone, create a placeholder
+        if (!phone) phone = '555-000-0000';
+      }
+
+      // Always add customer if we have at least a name or some parts
+      if (name || parts.length > 0) {
         customers.push({
           name: name || `Customer ${i + 1}`,
           email: email || `customer${i + 1}@example.com`,
@@ -192,15 +217,26 @@ export async function POST(request: NextRequest) {
   try {
     const { batchText, userId } = await request.json();
 
+    console.log('Batch import request:', {
+      hasText: !!batchText,
+      textLength: batchText?.length,
+      hasUserId: !!userId,
+      userId: userId
+    });
+
     if (!batchText || !userId) {
+      console.log('Missing required fields:', { batchText: !!batchText, userId: !!userId });
       return NextResponse.json({ error: 'Missing batch text or user ID' }, { status: 400 });
     }
 
     // Parse the batch text into customer objects
     const customers = parseBatchText(batchText);
 
+    console.log('Parsed customers:', customers.length);
+
     if (customers.length === 0) {
-      return NextResponse.json({ error: 'No valid customer data found in the provided text' }, { status: 400 });
+      console.log('No valid customers found in text:', batchText.substring(0, 200));
+      return NextResponse.json({ error: 'No valid customer data found in the provided text. Please check your data format.' }, { status: 400 });
     }
 
     let successCount = 0;
@@ -232,12 +268,14 @@ export async function POST(request: NextRequest) {
 
         if (error) {
           failedCount++;
+          console.error('Database error for customer:', customer.name, error);
           errors.push(`Row ${i + 1} (${customer.name}): ${error.message}`);
         } else {
           successCount++;
         }
       } catch (error: any) {
         failedCount++;
+        console.error('Processing error for customer:', customer.name, error);
         errors.push(`Row ${i + 1} (${customer.name}): ${error.message || 'Unknown error'}`);
       }
     }
