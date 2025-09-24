@@ -102,6 +102,10 @@ export default function Home() {
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
   const [isManualSaving, setIsManualSaving] = useState(false); // Lock to prevent auto-save interference
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchText, setBatchText] = useState('');
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [batchResults, setBatchResults] = useState<{ success: number; failed: number; errors: string[] }>({ success: 0, failed: 0, errors: [] });
 
   // Fallback function to load from localStorage
   const loadFromLocalStorageFallback = useCallback(() => {
@@ -780,6 +784,54 @@ export default function Home() {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const processBatchLeads = async () => {
+    if (!batchText.trim()) {
+      setError('Please enter batch customer information');
+      return;
+    }
+
+    setBatchProcessing(true);
+    setError('');
+    setBatchResults({ success: 0, failed: 0, errors: [] });
+
+    try {
+      const response = await fetch('/api/batch-customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          batchText: batchText,
+          userId: user?.id
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to process batch customers');
+      }
+
+      const result = await response.json();
+      setBatchResults(result);
+
+      if (result.success > 0) {
+        // Clear form and reload customers
+        setBatchText('');
+        await loadCustomers();
+        setActiveSection('pipeline');
+
+        try {
+          localStorage.setItem('patron-active-section', 'pipeline');
+        } catch (error) {
+          console.warn('Could not save section change:', error);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred processing batch customers');
+    } finally {
+      setBatchProcessing(false);
     }
   };
 
@@ -1956,36 +2008,130 @@ export default function Home() {
         {/* Add New Lead Section */}
         {activeSection === 'add' && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6 md:mb-8 border-t-4 border-green-500">
-            <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4 text-blue-800">Add New Sales Lead</h2>
-            <p className="text-xs md:text-sm text-black mb-2">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
-            <p className="text-xs text-green-600 mb-3 md:mb-4">💾 Your form data is automatically saved both locally and to your secure account - works even when switching tabs or browsers!</p>
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Example: John Smith, phone 555-123-4567, email john@example.com, address 123 Main St, installation scheduled for June 15th at 2pm..."
-              className="w-full h-32 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            />
-                      <div className="flex flex-wrap gap-2 md:gap-4 mt-3 md:mt-4">
+            <div className="flex justify-between items-center mb-2 md:mb-4">
+              <h2 className="text-lg md:text-xl font-semibold text-blue-800">Add New Sales Lead</h2>
+
+              {/* Toggle between Single and Batch mode */}
+              <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
-              onClick={formatCustomerInfo}
-              disabled={isLoading}
-              className="px-4 md:px-6 py-2 bg-green-600 text-white text-xs md:text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 md:gap-2"
-            >
-              {isLoading ? <LoadingSpinner /> : null}
-              <span className="flex items-center gap-1 md:gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Process Lead
-              </span>
+                  onClick={() => setBatchMode(false)}
+                  className={`px-3 py-1 text-xs md:text-sm rounded-md transition-colors ${
+                    !batchMode
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Single Lead
                 </button>
                 <button
-              onClick={clearForm}
-              className="px-4 md:px-6 py-2 bg-gray-500 text-white text-xs md:text-sm rounded-lg hover:bg-gray-600"
+                  onClick={() => setBatchMode(true)}
+                  className={`px-3 py-1 text-xs md:text-sm rounded-md transition-colors ${
+                    batchMode
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
                 >
-                  Clear
+                  Batch Import
                 </button>
               </div>
+            </div>
+
+            {!batchMode ? (
+              /* Single Lead Mode */
+              <>
+                <p className="text-xs md:text-sm text-black mb-2">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
+                <p className="text-xs text-green-600 mb-3 md:mb-4">💾 Your form data is automatically saved both locally and to your secure account - works even when switching tabs or browsers!</p>
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Example: John Smith, phone 555-123-4567, email john@example.com, address 123 Main St, installation scheduled for June 15th at 2pm..."
+                  className="w-full h-32 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+                <div className="flex flex-wrap gap-2 md:gap-4 mt-3 md:mt-4">
+                  <button
+                    onClick={formatCustomerInfo}
+                    disabled={isLoading}
+                    className="px-4 md:px-6 py-2 bg-green-600 text-white text-xs md:text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 md:gap-2"
+                  >
+                    {isLoading ? <LoadingSpinner /> : null}
+                    <span className="flex items-center gap-1 md:gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Process Lead
+                    </span>
+                  </button>
+                  <button
+                    onClick={clearForm}
+                    className="px-4 md:px-6 py-2 bg-gray-500 text-white text-xs md:text-sm rounded-lg hover:bg-gray-600"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Batch Import Mode */
+              <>
+                <p className="text-xs md:text-sm text-black mb-2">Paste multiple leads from your spreadsheet - each row should contain customer info. Our AI will process them all automatically.</p>
+                <p className="text-xs text-blue-600 mb-2">📊 Supported formats: Copy from Excel, Google Sheets, or plain text with multiple entries</p>
+                <p className="text-xs text-orange-600 mb-3 md:mb-4">⚡ Example: Paste multiple rows like "John Smith, 555-123-4567, john@email.com..." (one per line)</p>
+
+                <textarea
+                  value={batchText}
+                  onChange={(e) => setBatchText(e.target.value)}
+                  placeholder={`Paste your spreadsheet data here... Example:
+John Smith, 555-123-4567, john@email.com, 123 Main St, June 15th, 2pm
+Jane Doe, 555-987-6543, jane@email.com, 456 Oak Ave, June 16th, 10am
+Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
+                  className="w-full h-40 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+
+                <div className="flex flex-wrap gap-2 md:gap-4 mt-3 md:mt-4">
+                  <button
+                    onClick={processBatchLeads}
+                    disabled={batchProcessing}
+                    className="px-4 md:px-6 py-2 bg-purple-600 text-white text-xs md:text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1 md:gap-2"
+                  >
+                    {batchProcessing ? <LoadingSpinner /> : null}
+                    <span className="flex items-center gap-1 md:gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                        <path fillRule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 102 0V3a2 2 0 012 2v6.5l2.5-2.5a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4A1 1 0 116.5 9.5L9 12V5a2 2 0 01-2-2z" clipRule="evenodd" />
+                      </svg>
+                      {batchProcessing ? 'Processing Batch...' : 'Process Batch Leads'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setBatchText('')}
+                    className="px-4 md:px-6 py-2 bg-gray-500 text-white text-xs md:text-sm rounded-lg hover:bg-gray-600"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                {/* Batch Results */}
+                {(batchResults.success > 0 || batchResults.failed > 0) && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold text-sm text-gray-800 mb-2">Batch Import Results:</h3>
+                    <div className="flex gap-4 mb-2">
+                      <span className="text-green-600 text-sm">✅ Successful: {batchResults.success}</span>
+                      <span className="text-red-600 text-sm">❌ Failed: {batchResults.failed}</span>
+                    </div>
+                    {batchResults.errors.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="text-sm text-red-600 cursor-pointer">View Errors ({batchResults.errors.length})</summary>
+                        <div className="mt-2 text-xs text-red-500 max-h-32 overflow-y-auto">
+                          {batchResults.errors.map((error, index) => (
+                            <div key={index} className="mb-1">• {error}</div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
             {error && <p className="text-red-600 mt-2">{error}</p>}
           </div>
         )}
