@@ -188,6 +188,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer soulemane'
         },
         body: JSON.stringify({
           batchText: batchText,

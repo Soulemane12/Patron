@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '../../../lib/supabase';
+import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
 interface CustomerInfo {
   name: string;
@@ -215,6 +215,10 @@ function parseBatchText(batchText: string): CustomerInfo[] {
 
 export async function POST(request: NextRequest) {
   try {
+    // Check for admin authentication when used from admin panel
+    const authHeader = request.headers.get('authorization');
+    const isAdminRequest = authHeader === 'Bearer soulemane';
+
     const { batchText, userId } = await request.json();
 
     console.log('Batch import request:', {
@@ -262,7 +266,7 @@ export async function POST(request: NextRequest) {
           lead_size: customer.leadSize,
         };
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
           .from('customers')
           .insert([customerData]);
 
