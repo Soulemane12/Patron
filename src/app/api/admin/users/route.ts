@@ -49,7 +49,10 @@ export async function GET(request: NextRequest) {
         phone: user.phone,
         confirmed_at: user.confirmed_at,
         is_paused: status?.is_paused || false,
-        paused_at: status?.paused_at || null
+        paused_at: status?.paused_at || null,
+        is_approved: status?.is_approved || false,
+        approved_at: status?.approved_at || null,
+        approved_by: status?.approved_by || null
       };
     });
 

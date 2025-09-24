@@ -458,7 +458,43 @@ export default function Home() {
         if (session?.user) {
           console.log('Valid session found for user:', session.user.email);
 
-          // User status checks removed to prevent 406 errors and auth loops
+          // Check if user is approved before allowing access
+          try {
+            const approvalResponse = await fetch('/api/check-approval', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ userId: session.user.id })
+            });
+
+            if (approvalResponse.ok) {
+              const approvalData = await approvalResponse.json();
+
+              if (!approvalData.isApproved) {
+                // User is not approved, sign them out and redirect
+                console.log('User not approved, redirecting to login');
+                await supabase.auth.signOut();
+                if (mounted) {
+                  router.push('/login');
+                }
+                return;
+              }
+
+              if (approvalData.isPaused) {
+                // User is paused, sign them out and redirect with message
+                console.log('User is paused, redirecting to login');
+                await supabase.auth.signOut();
+                if (mounted) {
+                  window.location.href = '/login?message=account_paused';
+                }
+                return;
+              }
+            }
+          } catch (approvalError) {
+            console.error('Error checking approval status:', approvalError);
+            // Continue with login if approval check fails (fallback)
+          }
 
           if (mounted) {
             setUser(session.user);
@@ -497,7 +533,41 @@ export default function Home() {
         if (user) {
           console.log('User found:', user.email);
 
-          // User status checks removed to prevent 406 errors and auth loops
+          // Check if user is approved before allowing access
+          try {
+            const approvalResponse = await fetch('/api/check-approval', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ userId: user.id })
+            });
+
+            if (approvalResponse.ok) {
+              const approvalData = await approvalResponse.json();
+
+              if (!approvalData.isApproved) {
+                // User is not approved, redirect to login
+                console.log('User not approved, redirecting to login');
+                if (mounted) {
+                  router.push('/login');
+                }
+                return;
+              }
+
+              if (approvalData.isPaused) {
+                // User is paused, redirect with message
+                console.log('User is paused, redirecting to login');
+                if (mounted) {
+                  window.location.href = '/login?message=account_paused';
+                }
+                return;
+              }
+            }
+          } catch (approvalError) {
+            console.error('Error checking approval status:', approvalError);
+            // Continue with login if approval check fails (fallback)
+          }
 
           if (mounted) {
             setUser(user);
@@ -553,9 +623,40 @@ export default function Home() {
           router.push('/login');
         } else if (event === 'SIGNED_IN' && session?.user) {
           console.log('User signed in:', session.user.email);
-          
-          // User status checks removed to prevent 406 errors and auth loops
-          
+
+          // Check if user is approved before allowing access
+          try {
+            const approvalResponse = await fetch('/api/check-approval', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ userId: session.user.id })
+            });
+
+            if (approvalResponse.ok) {
+              const approvalData = await approvalResponse.json();
+
+              if (!approvalData.isApproved) {
+                // User is not approved, sign them out
+                console.log('User not approved, signing out');
+                await supabase.auth.signOut();
+                return;
+              }
+
+              if (approvalData.isPaused) {
+                // User is paused, sign them out and redirect
+                console.log('User is paused, signing out');
+                await supabase.auth.signOut();
+                window.location.href = '/login?message=account_paused';
+                return;
+              }
+            }
+          } catch (approvalError) {
+            console.error('Error checking approval status:', approvalError);
+            // Continue with login if approval check fails (fallback)
+          }
+
           setUser(session.user);
           setIsAuthenticated(true);
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {

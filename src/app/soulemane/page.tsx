@@ -11,6 +11,9 @@ interface AdminUser {
   last_sign_in_at: string;
   is_paused?: boolean;
   paused_at?: string;
+  is_approved?: boolean;
+  approved_at?: string;
+  approved_by?: string;
 }
 
 interface AdminCustomer {
@@ -57,6 +60,7 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [userCustomers, setUserCustomers] = useState<AdminCustomer[]>([]);
   const [pausingUser, setPausingUser] = useState<string | null>(null);
+  const [approvingUser, setApprovingUser] = useState<string | null>(null);
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<AdminCustomer | null>(null);
   const [newCustomerData, setNewCustomerData] = useState<NewCustomerData>({
@@ -158,6 +162,36 @@ export default function AdminPage() {
     const cancelled = userCustomersList.filter(c => c.status === 'cancelled').length;
     
     return { total, active, completed, notPaid, paid, cancelled };
+  };
+
+  const handleApproveUser = async (userId: string, action: 'approve' | 'disapprove') => {
+    setApprovingUser(userId);
+    try {
+      const response = await fetch('/api/admin/users/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer soulemane'
+        },
+        body: JSON.stringify({ userId, action })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to ${action} user`);
+      }
+
+      const result = await response.json();
+      alert(result.message || `User ${action}d successfully`);
+
+      // Reload data to reflect changes
+      loadAllData();
+    } catch (error: any) {
+      console.error(`Error ${action}ing user:`, error);
+      alert(`Failed to ${action} user: ${error.message || 'Unknown error'}`);
+    } finally {
+      setApprovingUser(null);
+    }
   };
 
   const handlePauseUser = async (userId: string, action: 'pause' | 'unpause') => {
@@ -645,6 +679,7 @@ export default function AdminPage() {
                                          <thead className="bg-gray-50">
                        <tr>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Approval</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Sign In</th>
@@ -656,12 +691,26 @@ export default function AdminPage() {
                       {users.map((user) => {
                         const stats = getCustomerStats(user.id);
                                                  return (
-                           <tr key={user.id} className={`hover:bg-gray-50 ${user.is_paused ? 'bg-red-50' : ''}`}>
+                           <tr key={user.id} className={`hover:bg-gray-50 ${user.is_paused ? 'bg-red-50' : !user.is_approved ? 'bg-yellow-50' : ''}`}>
                              <td className="px-4 py-3 text-sm text-gray-900">{user.email}</td>
                              <td className="px-4 py-3 text-sm">
                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                 user.is_paused 
-                                   ? 'bg-red-100 text-red-800' 
+                                 user.is_approved
+                                   ? 'bg-green-100 text-green-800'
+                                   : 'bg-yellow-100 text-yellow-800'
+                               }`}>
+                                 {user.is_approved ? 'APPROVED' : 'PENDING'}
+                               </span>
+                               {user.is_approved && user.approved_at && (
+                                 <div className="text-xs text-gray-500 mt-1">
+                                   Approved: {new Date(user.approved_at).toLocaleDateString()}
+                                 </div>
+                               )}
+                             </td>
+                             <td className="px-4 py-3 text-sm">
+                               <span className={`px-2 py-1 text-xs rounded-full ${
+                                 user.is_paused
+                                   ? 'bg-red-100 text-red-800'
                                    : 'bg-green-100 text-green-800'
                                }`}>
                                  {user.is_paused ? 'PAUSED' : 'ACTIVE'}
@@ -687,29 +736,47 @@ export default function AdminPage() {
                                </div>
                              </td>
                              <td className="px-4 py-3 text-sm">
-                               <div className="flex gap-2">
+                               <div className="flex gap-2 flex-wrap">
                                  <button
                                    onClick={() => viewUserCustomers(user)}
                                    className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600"
                                  >
                                    View Customers
                                  </button>
-                                 {user.is_paused ? (
-                                   <div className="flex gap-1 flex-wrap">
-                                     <button
-                                       onClick={() => handlePauseUser(user.id, 'unpause')}
-                                       disabled={pausingUser === user.id}
-                                       className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600 disabled:opacity-50"
-                                     >
-                                       {pausingUser === user.id ? 'Unpausing...' : 'Unpause'}
-                                     </button>
 
-                                   </div>
+                                 {/* Approval Actions */}
+                                 {user.is_approved ? (
+                                   <button
+                                     onClick={() => handleApproveUser(user.id, 'disapprove')}
+                                     disabled={approvingUser === user.id}
+                                     className="bg-yellow-500 text-white px-2 py-1 rounded text-xs hover:bg-yellow-600 disabled:opacity-50"
+                                   >
+                                     {approvingUser === user.id ? 'Disapproving...' : 'Disapprove'}
+                                   </button>
+                                 ) : (
+                                   <button
+                                     onClick={() => handleApproveUser(user.id, 'approve')}
+                                     disabled={approvingUser === user.id}
+                                     className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600 disabled:opacity-50"
+                                   >
+                                     {approvingUser === user.id ? 'Approving...' : 'Approve'}
+                                   </button>
+                                 )}
+
+                                 {/* Pause Actions */}
+                                 {user.is_paused ? (
+                                   <button
+                                     onClick={() => handlePauseUser(user.id, 'unpause')}
+                                     disabled={pausingUser === user.id}
+                                     className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600 disabled:opacity-50"
+                                   >
+                                     {pausingUser === user.id ? 'Unpausing...' : 'Unpause'}
+                                   </button>
                                  ) : (
                                    <button
                                      onClick={() => handlePauseUser(user.id, 'pause')}
                                      disabled={pausingUser === user.id}
-                                     className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 disabled:opacity-50"
+                                     className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 disabled:opacity-50"
                                    >
                                      {pausingUser === user.id ? 'Pausing...' : 'Pause'}
                                    </button>

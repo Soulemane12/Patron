@@ -164,11 +164,44 @@ export default function LoginPage() {
       
       if (data?.session && data?.user) {
         console.log('Login successful! User:', data.user.email);
-        
-        // Immediate redirect - the auth state listener will handle the session
+
+        // Check if user is approved before allowing access
+        try {
+          const approvalResponse = await fetch('/api/check-approval', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userId: data.user.id })
+          });
+
+          if (approvalResponse.ok) {
+            const approvalData = await approvalResponse.json();
+
+            if (!approvalData.isApproved) {
+              // User is not approved, sign them out and show message
+              await supabase.auth.signOut();
+              setError('Your account is pending approval. Please contact the administrator for access.');
+              setLoading(false);
+              return;
+            }
+
+            if (approvalData.isPaused) {
+              // User is paused, sign them out and redirect with message
+              await supabase.auth.signOut();
+              window.location.href = '/login?message=account_paused';
+              return;
+            }
+          }
+        } catch (approvalError) {
+          console.error('Error checking approval status:', approvalError);
+          // Continue with login if approval check fails (fallback)
+        }
+
+        // User is approved, redirect
         console.log('Login successful, redirecting immediately...');
         window.location.href = '/';
-        
+
       } else {
         console.error('Login succeeded but no session/user found');
         setError('Login failed - no session created. Please try again.');
