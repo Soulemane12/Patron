@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       receivedText: !!batchText,
       receivedUserId: !!userId,
       textLength: batchText?.length || 0,
-      linesCount: batchText ? batchText.split('\n').filter(line => line.trim()).length : 0
+      linesCount: batchText ? batchText.split('\n').filter((line: string) => line.trim()).length : 0
     });
 
   } catch (error: any) {
