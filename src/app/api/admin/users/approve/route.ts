@@ -22,21 +22,6 @@ export async function POST(request: NextRequest) {
     const isApproved = action === 'approve';
 
     try {
-      // First ensure the user_status table exists with approval columns
-      console.log('Ensuring user_status table exists with approval columns...');
-      const { error: rpcError } = await supabaseAdmin.rpc('create_user_status_with_approval_if_not_exists');
-
-      if (rpcError) {
-        console.error('Error creating/updating user_status table:', rpcError);
-        return NextResponse.json({
-          error: `Failed to prepare user status table: ${rpcError.message}`,
-          details: rpcError
-        }, { status: 500 });
-      }
-
-      // Wait a moment for schema changes to be applied
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       // Check if this specific user status exists
       const { data: existingStatus, error: checkError } = await supabaseAdmin
         .from('user_status')
