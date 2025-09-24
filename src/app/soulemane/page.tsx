@@ -62,6 +62,11 @@ export default function AdminPage() {
   const [pausingUser, setPausingUser] = useState<string | null>(null);
   const [approvingUser, setApprovingUser] = useState<string | null>(null);
   const [showAddLeadForm, setShowAddLeadForm] = useState(false);
+  const [showBatchImport, setShowBatchImport] = useState(false);
+  const [batchText, setBatchText] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [batchResults, setBatchResults] = useState<{ success: number; failed: number; errors: string[] }>({ success: 0, failed: 0, errors: [] });
   const [editingCustomer, setEditingCustomer] = useState<AdminCustomer | null>(null);
   const [newCustomerData, setNewCustomerData] = useState<NewCustomerData>({
     user_id: '',
@@ -162,6 +167,54 @@ export default function AdminPage() {
     const cancelled = userCustomersList.filter(c => c.status === 'cancelled').length;
     
     return { total, active, completed, notPaid, paid, cancelled };
+  };
+
+  const handleBatchImport = async () => {
+    if (!batchText.trim()) {
+      alert('Please enter batch customer information');
+      return;
+    }
+
+    if (!selectedUserId) {
+      alert('Please select a user to assign the customers to');
+      return;
+    }
+
+    setBatchProcessing(true);
+    setBatchResults({ success: 0, failed: 0, errors: [] });
+
+    try {
+      const response = await fetch('/api/batch-customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          batchText: batchText,
+          userId: selectedUserId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to process batch customers');
+      }
+
+      const result = await response.json();
+      setBatchResults(result);
+
+      if (result.success > 0) {
+        // Clear form and reload data
+        setBatchText('');
+        setSelectedUserId('');
+        loadAllData();
+        alert(`Successfully imported ${result.success} customers${result.failed > 0 ? ` (${result.failed} failed)` : ''}!`);
+      }
+    } catch (error: any) {
+      console.error('Error processing batch customers:', error);
+      alert(`Failed to process batch customers: ${error.message || 'Unknown error'}`);
+    } finally {
+      setBatchProcessing(false);
+    }
   };
 
   const handleApproveUser = async (userId: string, action: 'approve' | 'disapprove') => {
@@ -479,6 +532,15 @@ export default function AdminPage() {
                   {showAddLeadForm ? 'Cancel Add Lead' : justAddedLead ? 'Add Another Lead' : 'Add New Lead'}
                 </button>
 
+                <button
+                  onClick={() => {
+                    setShowBatchImport(!showBatchImport);
+                    setBatchResults({ success: 0, failed: 0, errors: [] });
+                  }}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  {showBatchImport ? 'Cancel Batch Import' : 'Batch Import Leads'}
+                </button>
               </div>
 
               {/* Add Lead Form */}
@@ -668,6 +730,117 @@ export default function AdminPage() {
                       </button>
                     </div>
                   </form>
+                </div>
+              )}
+
+              {/* Batch Import Form */}
+              {showBatchImport && (
+                <div className="bg-purple-50 p-6 rounded-lg mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Batch Import Leads</h3>
+                  <p className="text-sm text-gray-600 mb-4">Import multiple customers at once from your spreadsheet. Select a user to assign these customers to, then paste your data.</p>
+
+                  <div className="space-y-4">
+                    {/* User Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Assign to User</label>
+                      <select
+                        value={selectedUserId}
+                        onChange={(e) => setSelectedUserId(e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-purple-500"
+                        required
+                      >
+                        <option value="">Select User</option>
+                        {users.filter(user => user.is_approved && !user.is_paused).map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Batch Data Input */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Customer Data</label>
+                      <p className="text-xs text-gray-500 mb-2">
+                        Paste data from Excel, Google Sheets, or CSV. Each row should contain customer info.
+                      </p>
+                      <textarea
+                        value={batchText}
+                        onChange={(e) => setBatchText(e.target.value)}
+                        rows={8}
+                        placeholder={`Example format:
+John Smith, 555-123-4567, john@email.com, 123 Main St, June 15th, 2pm
+Jane Doe, 555-987-6543, jane@email.com, 456 Oak Ave, June 16th, 10am
+Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
+                        className="w-full p-3 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-purple-500 resize-none"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleBatchImport}
+                        disabled={batchProcessing || !selectedUserId || !batchText.trim()}
+                        className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {batchProcessing ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                            </svg>
+                            Process Batch Import
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setBatchText('');
+                          setBatchResults({ success: 0, failed: 0, errors: [] });
+                        }}
+                        className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    {/* Batch Results */}
+                    {(batchResults.success > 0 || batchResults.failed > 0) && (
+                      <div className="mt-4 p-4 bg-white rounded-lg border border-purple-200">
+                        <h4 className="font-semibold text-sm text-gray-800 mb-3">Import Results:</h4>
+                        <div className="flex gap-6 mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                            <span className="text-sm text-green-600">Successful: {batchResults.success}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-red-500 rounded-full"></span>
+                            <span className="text-sm text-red-600">Failed: {batchResults.failed}</span>
+                          </div>
+                        </div>
+
+                        {batchResults.errors.length > 0 && (
+                          <details className="mt-3">
+                            <summary className="text-sm text-red-600 cursor-pointer font-medium">
+                              View Error Details ({batchResults.errors.length})
+                            </summary>
+                            <div className="mt-2 p-3 bg-red-50 rounded max-h-40 overflow-y-auto">
+                              {batchResults.errors.map((error, index) => (
+                                <div key={index} className="text-xs text-red-600 mb-1">
+                                  • {error}
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
