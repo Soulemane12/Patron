@@ -15,7 +15,7 @@ interface CustomerInfo {
 
 // Function to parse different spreadsheet formats
 function parseBatchText(batchText: string): CustomerInfo[] {
-  const lines = batchText.split('\n').filter(line => line.trim());
+  const lines = batchText.split('\n').filter((line: string) => line.trim());
   const customers: CustomerInfo[] = [];
 
   for (let i = 0; i < lines.length; i++) {

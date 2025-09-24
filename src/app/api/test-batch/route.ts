@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Simple parsing test
     if (batchText) {
-      const lines = batchText.split('\n').filter(line => line.trim());
+      const lines = batchText.split('\n').filter((line: string) => line.trim());
       console.log('Lines found:', lines.length);
       console.log('First few lines:', lines.slice(0, 3));
     }
