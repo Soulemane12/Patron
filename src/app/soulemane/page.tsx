@@ -98,6 +98,14 @@ export default function AdminPage() {
   const [customerInputText, setCustomerInputText] = useState('');
   const [isFormattingCustomer, setIsFormattingCustomer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Customer selection state
+  const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [bulkActionType, setBulkActionType] = useState<'status' | 'delete' | 'transfer' | ''>('');
+  const [bulkStatus, setBulkStatus] = useState<'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress'>('active');
+  const [bulkTransferUserId, setBulkTransferUserId] = useState('');
+  const [processingBulkAction, setProcessingBulkAction] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [justAddedLead, setJustAddedLead] = useState(false);
   // Removed processedCustomerData state to simplify
@@ -158,6 +166,9 @@ export default function AdminPage() {
     setSelectedUser(user);
     const userCustomersList = customers.filter(c => c.user_id === user.id);
     setUserCustomers(userCustomersList);
+    // Reset selections when switching users
+    setSelectedCustomers([]);
+    setShowBulkActions(false);
   };
 
   const getCustomerStats = (userId: string) => {
@@ -497,6 +508,98 @@ export default function AdminPage() {
 
   const cancelEdit = () => {
     setEditingCustomer(null);
+  };
+
+  // Customer selection functions
+  const handleSelectCustomer = (customerId: string) => {
+    setSelectedCustomers(prev =>
+      prev.includes(customerId)
+        ? prev.filter(id => id !== customerId)
+        : [...prev, customerId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedCustomers.length === userCustomers.length && userCustomers.length > 0) {
+      setSelectedCustomers([]);
+    } else {
+      setSelectedCustomers(userCustomers.map(customer => customer.id));
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (selectedCustomers.length === 0) return;
+
+    const confirmMessage = bulkActionType === 'delete'
+      ? `Are you sure you want to delete ${selectedCustomers.length} customer(s)?`
+      : bulkActionType === 'transfer'
+      ? `Are you sure you want to transfer ${selectedCustomers.length} customer(s) to another user?`
+      : `Are you sure you want to update the status of ${selectedCustomers.length} customer(s)?`;
+
+    if (!confirm(confirmMessage)) return;
+
+    setProcessingBulkAction(true);
+    try {
+      if (bulkActionType === 'delete') {
+        // Delete selected customers
+        for (const customerId of selectedCustomers) {
+          await fetch(`/api/admin/customers/${customerId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer soulemane' }
+          });
+        }
+        alert(`Successfully deleted ${selectedCustomers.length} customer(s)`);
+      } else if (bulkActionType === 'status') {
+        // Update status for selected customers
+        for (const customerId of selectedCustomers) {
+          const customer = userCustomers.find(c => c.id === customerId);
+          if (customer) {
+            await fetch(`/api/admin/customers/${customerId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer soulemane'
+              },
+              body: JSON.stringify({
+                ...customer,
+                status: bulkStatus
+              })
+            });
+          }
+        }
+        alert(`Successfully updated status for ${selectedCustomers.length} customer(s)`);
+      } else if (bulkActionType === 'transfer' && bulkTransferUserId) {
+        // Transfer customers to another user
+        for (const customerId of selectedCustomers) {
+          const customer = userCustomers.find(c => c.id === customerId);
+          if (customer) {
+            await fetch(`/api/admin/customers/${customerId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer soulemane'
+              },
+              body: JSON.stringify({
+                ...customer,
+                user_id: bulkTransferUserId
+              })
+            });
+          }
+        }
+        alert(`Successfully transferred ${selectedCustomers.length} customer(s)`);
+      }
+
+      // Reset state and reload data
+      setSelectedCustomers([]);
+      setShowBulkActions(false);
+      setBulkActionType('');
+      loadAllData();
+    } catch (error) {
+      console.error('Bulk action error:', error);
+      alert('Failed to complete bulk action');
+    } finally {
+      setProcessingBulkAction(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -1123,13 +1226,113 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
               {/* Selected User's Customers */}
               {selectedUser && (
                 <div className="mt-8">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                    Customers for {selectedUser.email}
-                  </h2>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold text-gray-800">
+                      Customers for {selectedUser.email}
+                    </h2>
+
+                    {/* Bulk Actions Controls */}
+                    {userCustomers.length > 0 && (
+                      <div className="flex gap-2">
+                        {selectedCustomers.length > 0 && (
+                          <button
+                            onClick={() => setShowBulkActions(!showBulkActions)}
+                            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
+                          >
+                            Bulk Actions ({selectedCustomers.length})
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bulk Actions Panel */}
+                  {showBulkActions && selectedCustomers.length > 0 && (
+                    <div className="bg-orange-50 p-4 rounded-lg mb-4 border border-orange-200">
+                      <h3 className="font-semibold text-gray-800 mb-3">Bulk Actions for {selectedCustomers.length} customer(s)</h3>
+                      <div className="flex flex-wrap gap-4 items-end">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
+                          <select
+                            value={bulkActionType}
+                            onChange={(e) => setBulkActionType(e.target.value as any)}
+                            className="p-2 border border-gray-300 rounded bg-white text-black"
+                          >
+                            <option value="">Select action...</option>
+                            <option value="status">Update Status</option>
+                            <option value="transfer">Transfer to User</option>
+                            <option value="delete">Delete</option>
+                          </select>
+                        </div>
+
+                        {bulkActionType === 'status' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">New Status</label>
+                            <select
+                              value={bulkStatus}
+                              onChange={(e) => setBulkStatus(e.target.value as any)}
+                              className="p-2 border border-gray-300 rounded bg-white text-black"
+                            >
+                              <option value="active">Active</option>
+                              <option value="in_progress">Missed Installation</option>
+                              <option value="completed">Completed</option>
+                              <option value="not_paid">Not Paid</option>
+                              <option value="paid">Paid</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </div>
+                        )}
+
+                        {bulkActionType === 'transfer' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Transfer To</label>
+                            <select
+                              value={bulkTransferUserId}
+                              onChange={(e) => setBulkTransferUserId(e.target.value)}
+                              className="p-2 border border-gray-300 rounded bg-white text-black"
+                            >
+                              <option value="">Select user...</option>
+                              {users.filter(u => u.id !== selectedUser?.id).map(user => (
+                                <option key={user.id} value={user.id}>{user.email}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={handleBulkAction}
+                          disabled={processingBulkAction || !bulkActionType || (bulkActionType === 'transfer' && !bulkTransferUserId)}
+                          className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                        >
+                          {processingBulkAction ? 'Processing...' : 'Apply'}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setShowBulkActions(false);
+                            setBulkActionType('');
+                            setSelectedCustomers([]);
+                          }}
+                          className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="overflow-x-auto">
                     <table className="min-w-full bg-white border border-gray-200 rounded-lg">
                       <thead className="bg-gray-50">
                         <tr>
+                          <th className="px-4 py-3 text-left">
+                            <input
+                              type="checkbox"
+                              checked={selectedCustomers.length === userCustomers.length && userCustomers.length > 0}
+                              onChange={handleSelectAll}
+                              className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                            />
+                          </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
@@ -1144,6 +1347,14 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                       <tbody className="divide-y divide-gray-200">
                         {userCustomers.map((customer) => (
                           <tr key={customer.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedCustomers.includes(customer.id)}
+                                onChange={() => handleSelectCustomer(customer.id)}
+                                className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                              />
+                            </td>
                             <td className="px-4 py-3 text-sm text-gray-900">{customer.name}</td>
                             <td className="px-4 py-3 text-sm text-gray-900">{customer.email}</td>
                             <td className="px-4 py-3 text-sm text-gray-900">{customer.phone}</td>
