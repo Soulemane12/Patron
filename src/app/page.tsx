@@ -106,6 +106,9 @@ export default function Home() {
   const [batchText, setBatchText] = useState('');
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [batchResults, setBatchResults] = useState<{ success: number; failed: number; errors: string[] }>({ success: 0, failed: 0, errors: [] });
+  const [batchPreview, setBatchPreview] = useState<CustomerInfo[]>([]);
+  const [showBatchPreview, setShowBatchPreview] = useState(false);
+  const [isPreviewingBatch, setIsPreviewingBatch] = useState(false);
 
   // Fallback function to load from localStorage
   const loadFromLocalStorageFallback = useCallback(() => {
@@ -787,6 +790,38 @@ export default function Home() {
     }
   };
 
+  const previewBatchLeads = async () => {
+    if (!batchText.trim()) {
+      setError('Please enter batch customer information');
+      return;
+    }
+
+    setIsPreviewingBatch(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/preview-batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ batchText }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to preview batch customers');
+      }
+
+      const result = await response.json();
+      setBatchPreview(result.customers || []);
+      setShowBatchPreview(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred previewing batch customers');
+    } finally {
+      setIsPreviewingBatch(false);
+    }
+  };
+
   const processBatchLeads = async () => {
     if (!batchText.trim()) {
       setError('Please enter batch customer information');
@@ -827,6 +862,8 @@ export default function Home() {
       if (result.success > 0) {
         // Clear form and reload customers
         setBatchText('');
+        setBatchPreview([]);
+        setShowBatchPreview(false);
         await loadCustomers();
         setActiveSection('pipeline');
 
@@ -2096,8 +2133,23 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
 
                 <div className="flex flex-wrap gap-2 md:gap-4 mt-3 md:mt-4">
                   <button
+                    onClick={previewBatchLeads}
+                    disabled={isPreviewingBatch || batchProcessing}
+                    className="px-4 md:px-6 py-2 bg-blue-600 text-white text-xs md:text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1 md:gap-2"
+                  >
+                    {isPreviewingBatch ? <LoadingSpinner /> : null}
+                    <span className="flex items-center gap-1 md:gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                      </svg>
+                      {isPreviewingBatch ? 'Previewing...' : 'Preview Batch'}
+                    </span>
+                  </button>
+
+                  <button
                     onClick={processBatchLeads}
-                    disabled={batchProcessing}
+                    disabled={batchProcessing || isPreviewingBatch}
                     className="px-4 md:px-6 py-2 bg-purple-600 text-white text-xs md:text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1 md:gap-2"
                   >
                     {batchProcessing ? <LoadingSpinner /> : null}
@@ -2109,13 +2161,90 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                       {batchProcessing ? 'Processing Batch...' : 'Process Batch Leads'}
                     </span>
                   </button>
+
                   <button
-                    onClick={() => setBatchText('')}
+                    onClick={() => {
+                      setBatchText('');
+                      setBatchPreview([]);
+                      setShowBatchPreview(false);
+                    }}
                     className="px-4 md:px-6 py-2 bg-gray-500 text-white text-xs md:text-sm rounded-lg hover:bg-gray-600"
                   >
                     Clear
                   </button>
                 </div>
+
+                {/* Batch Preview */}
+                {showBatchPreview && batchPreview.length > 0 && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border-t-4 border-blue-500">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-800">Review Batch Import</h3>
+                      <button
+                        onClick={() => setShowBatchPreview(false)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-4">Found {batchPreview.length} customer{batchPreview.length === 1 ? '' : 's'} ready to import. Review the details below before proceeding:</p>
+
+                    <div className="max-h-96 overflow-y-auto">
+                      {batchPreview.map((customer, index) => (
+                        <div key={index} className="bg-white p-4 rounded-lg shadow-sm mb-3 border-l-4 border-green-400">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                              <div className="text-sm text-gray-900">{customer.name}</div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                              <div className="text-sm text-gray-900">{customer.email}</div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                              <div className="text-sm text-gray-900">{customer.phone}</div>
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Service Address</label>
+                              <div className="text-sm text-gray-900">{customer.serviceAddress}</div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Lead Size</label>
+                              <div className="text-sm text-gray-900">{customer.leadSize}</div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Installation Date</label>
+                              <div className="text-sm text-gray-900">{new Date(customer.installationDate).toLocaleDateString()}</div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Installation Time</label>
+                              <div className="text-sm text-gray-900">{customer.installationTime}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 flex gap-3">
+                      <button
+                        onClick={processBatchLeads}
+                        disabled={batchProcessing}
+                        className="px-6 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {batchProcessing ? <LoadingSpinner /> : null}
+                        Import {batchPreview.length} Customer{batchPreview.length === 1 ? '' : 's'}
+                      </button>
+                      <button
+                        onClick={() => setShowBatchPreview(false)}
+                        className="px-6 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600"
+                      >
+                        Back to Edit
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Batch Results */}
                 {(batchResults.success > 0 || batchResults.failed > 0) && (
