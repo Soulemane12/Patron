@@ -73,9 +73,9 @@ function parseBatchText(batchText: string): CustomerInfo[] {
   const lines = batchText.split('\n').filter((line: string) => line.trim());
   const customers: CustomerInfo[] = [];
 
-  // Check if this looks like a structured spreadsheet with headers
+  // Check if this looks like a structured spreadsheet with headers OR structured data without headers
   const firstLine = lines[0];
-  const isStructuredData = firstLine && (
+  const hasHeaders = firstLine && (
     firstLine.includes('Rep ID') ||
     firstLine.includes('Street Address') ||
     firstLine.includes('Installation Date') ||
@@ -83,13 +83,18 @@ function parseBatchText(batchText: string): CustomerInfo[] {
     firstLine.includes('Order Date')
   );
 
+  // Check if it looks like structured data based on pattern (many tab-separated columns)
+  const firstLineColumns = firstLine ? firstLine.split('\t').length : 0;
+  const hasStructuredPattern = firstLineColumns >= 20; // Your data has ~26 columns
+
+  const isStructuredData = hasHeaders || hasStructuredPattern;
+
   if (isStructuredData && lines.length > 1) {
     // Handle structured spreadsheet data
     const headers = lines[0].split('\t').map(h => h.trim());
 
-    // Find column indices - looking for the rep name which comes after Rep ID
+    // Find column indices - with fallback to fixed positions for known spreadsheet format
     const repIdIndex = headers.findIndex(h => h.includes('Rep ID'));
-    const repNameIndex = repIdIndex >= 0 ? repIdIndex + 1 : -1; // Rep name is typically in the column after Rep ID
     const streetAddressIndex = headers.findIndex(h => h.includes('Street Address'));
     const cityIndex = headers.findIndex(h => h.includes('City'));
     const stateIndex = headers.findIndex(h => h.includes('State'));
@@ -97,6 +102,16 @@ function parseBatchText(batchText: string): CustomerInfo[] {
     const installDateIndex = headers.findIndex(h => h.includes('Installation Date'));
     const fiberPlanIndex = headers.findIndex(h => h.includes('Fiber Plan'));
     const unitIndex = headers.findIndex(h => h.includes('Unit'));
+
+    // For structured data without headers, use fixed positions based on the spreadsheet format
+    let repNameIndex = repIdIndex >= 0 ? repIdIndex + 1 : -1;
+
+    // If we have structured data but no header matches, use fixed column positions
+    if (hasStructuredPattern && !hasHeaders) {
+      repNameIndex = 6; // Rep name is in column 7 (0-indexed as 6)
+    } else if (repIdIndex >= 0) {
+      repNameIndex = repIdIndex + 1; // Rep name comes after Rep ID
+    }
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -106,14 +121,29 @@ function parseBatchText(batchText: string): CustomerInfo[] {
         const parts = line.split('\t').map(part => part.trim());
 
         // Extract data from specific columns
-        const repName = repNameIndex >= 0 ? parts[repNameIndex] || '' : '';
-        const streetAddress = streetAddressIndex >= 0 ? parts[streetAddressIndex] || '' : '';
-        const unit = unitIndex >= 0 ? parts[unitIndex] || '' : '';
-        const city = cityIndex >= 0 ? parts[cityIndex] || '' : '';
-        const state = stateIndex >= 0 ? parts[stateIndex] || '' : '';
-        const zipCode = zipIndex >= 0 ? parts[zipIndex] || '' : '';
-        const installDate = installDateIndex >= 0 ? parts[installDateIndex] || '' : '';
-        const fiberPlan = fiberPlanIndex >= 0 ? parts[fiberPlanIndex] || '' : '';
+        let repName, streetAddress, unit, city, state, zipCode, installDate, fiberPlan;
+
+        if (hasStructuredPattern && !hasHeaders) {
+          // Use fixed positions for data without headers
+          repName = parts[6] || '';
+          streetAddress = parts[11] || '';
+          unit = parts[12] || '';
+          city = parts[13] || '';
+          state = parts[14] || '';
+          zipCode = parts[15] || '';
+          installDate = parts[17] || '';
+          fiberPlan = parts[8] || '';
+        } else {
+          // Use header-based indices
+          repName = repNameIndex >= 0 ? parts[repNameIndex] || '' : '';
+          streetAddress = streetAddressIndex >= 0 ? parts[streetAddressIndex] || '' : '';
+          unit = unitIndex >= 0 ? parts[unitIndex] || '' : '';
+          city = cityIndex >= 0 ? parts[cityIndex] || '' : '';
+          state = stateIndex >= 0 ? parts[stateIndex] || '' : '';
+          zipCode = zipIndex >= 0 ? parts[zipIndex] || '' : '';
+          installDate = installDateIndex >= 0 ? parts[installDateIndex] || '' : '';
+          fiberPlan = fiberPlanIndex >= 0 ? parts[fiberPlanIndex] || '' : '';
+        }
 
         // Build full address
         let serviceAddress = streetAddress;
