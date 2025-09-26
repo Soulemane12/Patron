@@ -793,6 +793,14 @@ export default function Home() {
       return;
     }
 
+    // Count number of lines to estimate number of customers
+    const lines = batchText.trim().split('\n').filter(line => line.trim()).length;
+
+    // Show confirmation dialog
+    if (!confirm(`Are you sure you want to process ${lines} batch lead${lines === 1 ? '' : 's'}?\n\nThis will:\n• Process and import all leads into your pipeline\n• Cannot be undone once processed\n\nClick OK to continue or Cancel to abort.`)) {
+      return;
+    }
+
     setBatchProcessing(true);
     setError('');
     setBatchResults({ success: 0, failed: 0, errors: [] });

@@ -180,6 +180,15 @@ export default function AdminPage() {
       return;
     }
 
+    // Count number of lines to estimate number of customers
+    const lines = batchText.trim().split('\n').filter(line => line.trim()).length;
+    const selectedUser = users.find(u => u.id === selectedUserId);
+
+    // Show confirmation dialog
+    if (!confirm(`Are you sure you want to process ${lines} batch customer${lines === 1 ? '' : 's'} for ${selectedUser?.email || 'selected user'}?\n\nThis will:\n• Process and import all customers into the system\n• Assign them to the selected user\n• Cannot be undone once processed\n\nClick OK to continue or Cancel to abort.`)) {
+      return;
+    }
+
     setBatchProcessing(true);
     setBatchResults({ success: 0, failed: 0, errors: [] });
 
