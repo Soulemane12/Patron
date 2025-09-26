@@ -68,10 +68,148 @@ function parseAndFormatDate(dateStr: string): string {
   }
 }
 
+// Function to parse sales report format
+function parseSalesReport(batchText: string): CustomerInfo[] {
+  const customers: CustomerInfo[] = [];
+  const lines = batchText.split('\n');
+
+  let currentCustomer: Partial<CustomerInfo> = {};
+  let collectingCustomerData = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Skip header lines like "Week 1:", "Total Sales:", etc.
+    if (line.includes('Week ') || line.includes('Total Sales:') || line.includes('Completed:') || line.includes('Cancels:') || line.includes('MONTHLY TOTAL') || line.includes('orders')) {
+      continue;
+    }
+
+    // Look for customer name patterns (starting with checkmarks or bullets)
+    if (line.match(/^[✓◦•]\s+(.+)/) || (line.includes('@') && !line.includes('Service address:') && !line.includes('Order number:'))) {
+      // If we have a previous customer, save it
+      if (currentCustomer.name && (currentCustomer.email || currentCustomer.phone || currentCustomer.serviceAddress)) {
+        customers.push(completeCustomer(currentCustomer));
+      }
+
+      // Start new customer
+      currentCustomer = {};
+      collectingCustomerData = true;
+
+      // Extract name from line with checkmark
+      const nameMatch = line.match(/^[✓◦•]\s+(.+)/);
+      if (nameMatch) {
+        currentCustomer.name = nameMatch[1].replace(/[✅💰]/g, '').trim();
+      }
+
+      // Check if email is on the same line
+      if (line.includes('@')) {
+        const emailMatch = line.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailMatch) {
+          currentCustomer.email = emailMatch[1];
+        }
+      }
+
+      continue;
+    }
+
+    if (collectingCustomerData && currentCustomer.name) {
+      // Extract email
+      if (!currentCustomer.email && line.includes('@')) {
+        const emailMatch = line.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailMatch) {
+          currentCustomer.email = emailMatch[1];
+        }
+      }
+
+      // Extract phone number
+      if (!currentCustomer.phone && line.match(/\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/)) {
+        const phoneMatch = line.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/);
+        if (phoneMatch) {
+          currentCustomer.phone = phoneMatch[1];
+        }
+      }
+
+      // Extract service address
+      if (line.includes('Service address:') || line.includes('Service Address:')) {
+        const addressMatch = line.match(/Service [Aa]ddress:[-\s]*(.+)/);
+        if (addressMatch) {
+          currentCustomer.serviceAddress = addressMatch[1].trim();
+        }
+      }
+
+      // Extract installation date
+      if ((line.includes('Installation') || line.includes('Install')) && (line.includes('Date') || line.includes('date'))) {
+        const dateMatch = line.match(/(?:Installation|Install)\s*[Dd]ate:[-\s]*(.+)/);
+        if (dateMatch) {
+          currentCustomer.installationDate = parseAndFormatDate(dateMatch[1].trim());
+        }
+      }
+
+      // Extract installation time
+      if (line.match(/\d{1,2}:\d{2}/) || line.match(/\d{1,2}\s*(am|pm)/i)) {
+        const timeMatch = line.match(/(\d{1,2}[:\s]*\d{0,2}[-\s]*(am|pm|\d{1,2}[:\s]*\d{2}))/i);
+        if (timeMatch && !currentCustomer.installationTime) {
+          currentCustomer.installationTime = timeMatch[1].trim();
+        }
+      }
+
+      // Extract lead size
+      if (line.includes('✅') && (line.includes('500mb') || line.includes('1gig') || line.includes('2gig') || line.includes('2gb'))) {
+        if (line.toLowerCase().includes('500mb')) {
+          currentCustomer.leadSize = '500MB';
+        } else if (line.toLowerCase().includes('1gig') || line.toLowerCase().includes('1 gig')) {
+          currentCustomer.leadSize = '1GIG';
+        } else if (line.toLowerCase().includes('2gig') || line.toLowerCase().includes('2gb') || line.toLowerCase().includes('2 gig')) {
+          currentCustomer.leadSize = '2GIG';
+        }
+      }
+
+      // Stop collecting if we hit another customer or section
+      if (line.match(/^[✓◦•]\s+/) && line !== (currentCustomer.name ? `✓    ${currentCustomer.name}` : '')) {
+        collectingCustomerData = false;
+      }
+    }
+  }
+
+  // Don't forget the last customer
+  if (currentCustomer.name && (currentCustomer.email || currentCustomer.phone || currentCustomer.serviceAddress)) {
+    customers.push(completeCustomer(currentCustomer));
+  }
+
+  return customers;
+}
+
+// Helper function to complete customer data with defaults
+function completeCustomer(partial: Partial<CustomerInfo>): CustomerInfo {
+  return {
+    name: partial.name || 'Unknown Customer',
+    email: partial.email || `${(partial.name || 'customer').toLowerCase().replace(/\s+/g, '.')}@example.com`,
+    phone: partial.phone || '555-000-0000',
+    serviceAddress: partial.serviceAddress || 'Address not provided',
+    installationDate: partial.installationDate || (() => {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 7);
+      return futureDate.toISOString().split('T')[0];
+    })(),
+    installationTime: partial.installationTime || '10:00 AM',
+    isReferral: false,
+    referralSource: '',
+    leadSize: (partial.leadSize as '500MB' | '1GIG' | '2GIG') || '2GIG'
+  };
+}
+
 // Function to parse different spreadsheet formats
 function parseBatchText(batchText: string): CustomerInfo[] {
   const lines = batchText.split('\n').filter((line: string) => line.trim());
   const customers: CustomerInfo[] = [];
+
+  // Check if this looks like a sales report format
+  const isSalesReport = batchText.includes('Week ') || batchText.includes('Total Sales:') || batchText.includes('Order number:') || batchText.includes('Service address:');
+
+  if (isSalesReport) {
+    return parseSalesReport(batchText);
+  }
 
   // Check if this looks like a structured spreadsheet with headers OR structured data without headers
   const firstLine = lines[0];
