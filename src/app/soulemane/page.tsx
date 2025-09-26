@@ -106,6 +106,16 @@ export default function AdminPage() {
   const [bulkStatus, setBulkStatus] = useState<'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress'>('active');
   const [bulkTransferUserId, setBulkTransferUserId] = useState('');
   const [processingBulkAction, setProcessingBulkAction] = useState(false);
+
+  // All customers view state
+  const [showAllCustomers, setShowAllCustomers] = useState(false);
+  const [allSelectedCustomers, setAllSelectedCustomers] = useState<string[]>([]);
+  const [showAllBulkActions, setShowAllBulkActions] = useState(false);
+  const [allBulkActionType, setAllBulkActionType] = useState<'status' | 'delete' | 'transfer' | ''>('');
+  const [allBulkStatus, setAllBulkStatus] = useState<'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress'>('active');
+  const [allBulkTransferUserId, setAllBulkTransferUserId] = useState('');
+  const [processingAllBulkAction, setProcessingAllBulkAction] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [justAddedLead, setJustAddedLead] = useState(false);
   // Removed processedCustomerData state to simplify
@@ -602,6 +612,108 @@ export default function AdminPage() {
     }
   };
 
+  // All customers selection functions
+  const handleSelectAllCustomer = (customerId: string) => {
+    setAllSelectedCustomers(prev =>
+      prev.includes(customerId)
+        ? prev.filter(id => id !== customerId)
+        : [...prev, customerId]
+    );
+  };
+
+  const handleSelectAllAllCustomers = () => {
+    const filteredCustomers = getFilteredCustomers();
+    if (allSelectedCustomers.length === filteredCustomers.length && filteredCustomers.length > 0) {
+      setAllSelectedCustomers([]);
+    } else {
+      setAllSelectedCustomers(filteredCustomers.map(customer => customer.id));
+    }
+  };
+
+  const getFilteredCustomers = () => {
+    return customers.filter(customer =>
+      customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+      customer.email.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+      customer.service_address.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+      users.find(u => u.id === customer.user_id)?.email.toLowerCase().includes(customerSearchTerm.toLowerCase())
+    );
+  };
+
+  const handleAllBulkAction = async () => {
+    if (allSelectedCustomers.length === 0) return;
+
+    const confirmMessage = allBulkActionType === 'delete'
+      ? `Are you sure you want to delete ${allSelectedCustomers.length} customer(s)?`
+      : allBulkActionType === 'transfer'
+      ? `Are you sure you want to transfer ${allSelectedCustomers.length} customer(s) to another user?`
+      : `Are you sure you want to update the status of ${allSelectedCustomers.length} customer(s)?`;
+
+    if (!confirm(confirmMessage)) return;
+
+    setProcessingAllBulkAction(true);
+    try {
+      if (allBulkActionType === 'delete') {
+        // Delete selected customers
+        for (const customerId of allSelectedCustomers) {
+          await fetch(`/api/admin/customers/${customerId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer soulemane' }
+          });
+        }
+        alert(`Successfully deleted ${allSelectedCustomers.length} customer(s)`);
+      } else if (allBulkActionType === 'status') {
+        // Update status for selected customers
+        for (const customerId of allSelectedCustomers) {
+          const customer = customers.find(c => c.id === customerId);
+          if (customer) {
+            await fetch(`/api/admin/customers/${customerId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer soulemane'
+              },
+              body: JSON.stringify({
+                ...customer,
+                status: allBulkStatus
+              })
+            });
+          }
+        }
+        alert(`Successfully updated status for ${allSelectedCustomers.length} customer(s)`);
+      } else if (allBulkActionType === 'transfer' && allBulkTransferUserId) {
+        // Transfer customers to another user
+        for (const customerId of allSelectedCustomers) {
+          const customer = customers.find(c => c.id === customerId);
+          if (customer) {
+            await fetch(`/api/admin/customers/${customerId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer soulemane'
+              },
+              body: JSON.stringify({
+                ...customer,
+                user_id: allBulkTransferUserId
+              })
+            });
+          }
+        }
+        alert(`Successfully transferred ${allSelectedCustomers.length} customer(s)`);
+      }
+
+      // Reset state and reload data
+      setAllSelectedCustomers([]);
+      setShowAllBulkActions(false);
+      setAllBulkActionType('');
+      loadAllData();
+    } catch (error) {
+      console.error('All bulk action error:', error);
+      alert('Failed to complete bulk action');
+    } finally {
+      setProcessingAllBulkAction(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
@@ -695,6 +807,19 @@ export default function AdminPage() {
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   {showBatchImport ? 'Cancel Batch Import' : 'Batch Import Leads'}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowAllCustomers(!showAllCustomers);
+                    setAllSelectedCustomers([]);
+                    setShowAllBulkActions(false);
+                    setSelectedUser(null);
+                    setUserCustomers([]);
+                  }}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  {showAllCustomers ? 'Hide All Customers' : 'View All Customers'}
                 </button>
               </div>
 
@@ -1103,7 +1228,218 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                 </div>
               )}
 
+              {/* All Customers View */}
+              {showAllCustomers && (
+                <div className="bg-white rounded-lg shadow mb-6">
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h2 className="text-xl font-semibold text-gray-800">All Customers</h2>
+                        <p className="text-gray-600">Manage all customers across all users ({customers.length} total)</p>
+                      </div>
+
+                      {/* Search */}
+                      <div className="flex gap-4 items-center">
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="Search customers..."
+                            value={customerSearchTerm}
+                            onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+                        {allSelectedCustomers.length > 0 && (
+                          <button
+                            onClick={() => setShowAllBulkActions(!showAllBulkActions)}
+                            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
+                          >
+                            Bulk Actions ({allSelectedCustomers.length})
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Bulk Actions Panel */}
+                    {showAllBulkActions && allSelectedCustomers.length > 0 && (
+                      <div className="bg-orange-50 p-4 rounded-lg mb-4 border border-orange-200">
+                        <h3 className="font-semibold text-gray-800 mb-3">Bulk Actions for {allSelectedCustomers.length} customer(s)</h3>
+                        <div className="flex flex-wrap gap-4 items-end">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
+                            <select
+                              value={allBulkActionType}
+                              onChange={(e) => setAllBulkActionType(e.target.value as any)}
+                              className="p-2 border border-gray-300 rounded bg-white text-black"
+                            >
+                              <option value="">Select action...</option>
+                              <option value="status">Update Status</option>
+                              <option value="transfer">Transfer to User</option>
+                              <option value="delete">Delete</option>
+                            </select>
+                          </div>
+
+                          {allBulkActionType === 'status' && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">New Status</label>
+                              <select
+                                value={allBulkStatus}
+                                onChange={(e) => setAllBulkStatus(e.target.value as any)}
+                                className="p-2 border border-gray-300 rounded bg-white text-black"
+                              >
+                                <option value="active">Active</option>
+                                <option value="in_progress">Missed Installation</option>
+                                <option value="completed">Completed</option>
+                                <option value="not_paid">Not Paid</option>
+                                <option value="paid">Paid</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {allBulkActionType === 'transfer' && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Transfer To</label>
+                              <select
+                                value={allBulkTransferUserId}
+                                onChange={(e) => setAllBulkTransferUserId(e.target.value)}
+                                className="p-2 border border-gray-300 rounded bg-white text-black"
+                              >
+                                <option value="">Select user...</option>
+                                {users.map(user => (
+                                  <option key={user.id} value={user.id}>{user.email}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          <button
+                            onClick={handleAllBulkAction}
+                            disabled={processingAllBulkAction || !allBulkActionType || (allBulkActionType === 'transfer' && !allBulkTransferUserId)}
+                            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                          >
+                            {processingAllBulkAction ? 'Processing...' : 'Apply'}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setShowAllBulkActions(false);
+                              setAllBulkActionType('');
+                              setAllSelectedCustomers([]);
+                            }}
+                            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left">
+                            <input
+                              type="checkbox"
+                              checked={allSelectedCustomers.length === getFilteredCustomers().length && getFilteredCustomers().length > 0}
+                              onChange={handleSelectAllAllCustomers}
+                              className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                            />
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Installation</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead Size</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {getFilteredCustomers().map((customer) => (
+                          <tr key={customer.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={allSelectedCustomers.includes(customer.id)}
+                                onChange={() => handleSelectAllCustomer(customer.id)}
+                                className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{customer.name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{customer.email}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{customer.phone}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={customer.service_address}>
+                              {customer.service_address}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {users.find(u => u.id === customer.user_id)?.email || 'Unknown User'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              <div>
+                                <div>{new Date(customer.installation_date).toLocaleDateString()}</div>
+                                <div className="text-xs text-gray-500">{customer.installation_time}</div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                customer.status === 'active' || customer.status === undefined
+                                  ? 'bg-green-100 text-green-800'
+                                  : customer.status === 'in_progress'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : customer.status === 'cancelled'
+                                  ? 'bg-red-100 text-red-800'
+                                  : customer.status === 'completed'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : customer.status === 'paid'
+                                  ? 'bg-green-100 text-green-800'
+                                  : customer.status === 'not_paid'
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {customer.status === 'in_progress' ? 'Missed Installation' : customer.status || 'active'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              <span className="bg-purple-100 text-purple-800 px-2 py-1 text-xs rounded-full">
+                                {customer.lead_size || '2GIG'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => startEditingCustomer(customer)}
+                                  className="text-blue-600 hover:text-blue-900 text-sm"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCustomer(customer.id)}
+                                  className="text-red-600 hover:text-red-900 text-sm"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {getFilteredCustomers().length === 0 && (
+                    <p className="text-center py-8 text-gray-500">
+                      {customerSearchTerm ? 'No customers found matching your search.' : 'No customers found.'}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Users List */}
+              {!showAllCustomers && (
               <div>
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">All Users</h2>
                 <div className="overflow-x-auto">
@@ -1222,6 +1558,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                   </table>
                 </div>
               </div>
+              )}
 
               {/* Selected User's Customers */}
               {selectedUser && (
