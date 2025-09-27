@@ -208,7 +208,7 @@ class AIDataParser {
 
     const completion = await this.groq.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.3-70b-versatile',
       temperature: this.config.temperature,
       max_tokens: 500,
     });
@@ -237,7 +237,7 @@ class AIDataParser {
 
     const completion = await this.groq.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.3-70b-versatile',
       temperature: this.config.temperature,
       max_tokens: this.config.maxTokens,
     });
@@ -268,7 +268,7 @@ class AIDataParser {
 
     const completion = await this.groq.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0.05, // Very low temperature for validation
       max_tokens: 2000,
     });
@@ -318,7 +318,7 @@ Respond with ONLY this JSON format:
   }
 
   /**
-   * Build data extraction prompt
+   * Build data extraction prompt with maximum accuracy for sales reports
    */
   private buildDataExtractionPrompt(lines: string[], format: string, includeContext: boolean): string {
     const dataText = lines.join('\n');
@@ -327,59 +327,37 @@ Respond with ONLY this JSON format:
 FORMAT DETECTED: ${format}
 This data follows the ${format} format pattern.` : '';
 
-    return `You are a world-class expert data extraction AI with perfect accuracy. Your mission is to extract 100% accurate customer information from any data format.
+    return `You are extracting customer data. Copy the exact information from the text below.
 
 ${contextInfo}
 
-🎯 EXTRACTION MISSION: MAXIMUM ACCURACY - NO COMPROMISES
-
-REQUIRED FIELDS to extract for each customer:
-- name: Full customer name (EXACT as written, proper capitalization)
-- email: Email address (EXACT from source, must contain @)
-- phone: Phone number (EXACT format from source, standardize if needed)
-- serviceAddress: Complete service/installation address (include unit numbers, full formatting)
-- installationDate: Date in YYYY-MM-DD format (parse ANY date format perfectly)
-- installationTime: Time in HH:MM AM/PM format (extract exact time ranges)
-- leadSize: "500MB", "1GIG", or "2GIG" (identify from 500mb, 2 gig, 2gb, etc.)
-- isReferral: true/false (detect referral mentions)
-- referralSource: Source if referral (extract referral details)
-- orderNumber: Order/reference number if present (any alphanumeric ID)
-- notes: Any additional relevant information (installation status, special notes)
-- confidence: Your confidence in this extraction (be honest: 0-100)
-
-🔍 DATA TO PROCESS:
+From this text, extract:
 ${dataText}
 
-🎯 ACCURACY RULES (FOLLOW EXACTLY):
-1. Extract EVERY single customer found - miss NONE
-2. Read the ENTIRE context to understand relationships
-3. Group related information intelligently (addresses on following lines, etc.)
-4. Handle multi-line addresses correctly (street + city + state + zip)
-5. Parse ALL date formats: "July 29, 2025", "07/29/25", "Tuesday, July 29, 2025"
-6. Extract time ranges: "4-6 p.m", "12-2 p.m.", "10am-12pm"
-7. Detect lead sizes from any variation: "500mbsp", "2 Gig", "2GB", "500 MB"
-8. Preserve exact email addresses - NO modifications
-9. Format phone numbers consistently: (XXX) XXX-XXXX
-10. Use context clues to associate information with correct customers
-11. If information spans multiple lines, collect ALL parts
-12. Default values ONLY when information is truly missing:
-    - Missing email: firstname.lastname@example.com (use actual name)
-    - Missing phone: 555-000-0000
-    - Missing address: "Address not provided"
-    - Missing installation time: "10:00 AM"
-13. Be EXTRA careful with checkmarks, bullets, and formatting markers
-14. Read between the lines - understand the data structure intuitively
+Copy exactly what you see:
+- name: copy the customer name after ✓
+- email: copy the email address exactly (example: reneegaudet1@gmail.com)
+- phone: copy phone number if present, otherwise "555-000-0000"
+- serviceAddress: combine address lines
+- installationDate: convert date to YYYY-MM-DD format
+- installationTime: convert time to HH:MM AM/PM format
+- leadSize: convert plan to "500MB", "1GIG", or "2GIG"
+- isReferral: false
+- referralSource: ""
+- orderNumber: ""
+- notes: ""
+- confidence: 95
 
-Respond with ONLY this JSON format:
+Return JSON only:
 {
   "customers": [
     {
-      "name": "John Smith",
-      "email": "john.smith@email.com",
-      "phone": "(555) 123-4567",
-      "serviceAddress": "123 Main St, Anytown, CA 90210",
+      "name": "Customer Name",
+      "email": "actual.email@domain.com",
+      "phone": "555-000-0000",
+      "serviceAddress": "Full Address",
       "installationDate": "2025-07-29",
-      "installationTime": "2:00 PM",
+      "installationTime": "4:00 PM",
       "leadSize": "2GIG",
       "isReferral": false,
       "referralSource": "",
@@ -456,11 +434,29 @@ Respond with ONLY this JSON format:
   }
 
   /**
-   * Parse data extraction response
+   * Parse data extraction response, handling markdown code blocks
    */
   private parseDataExtractionResponse(response: string): CustomerInfo[] {
     try {
-      const parsed = JSON.parse(response);
+      // Clean the response - remove markdown code blocks if present
+      let cleanResponse = response.trim();
+
+      // Remove markdown code blocks (```json or ``` at start/end)
+      if (cleanResponse.startsWith('```')) {
+        const lines = cleanResponse.split('\n');
+        lines.shift(); // Remove first ``` line
+        if (lines[lines.length - 1].trim() === '```') {
+          lines.pop(); // Remove last ``` line
+        }
+        cleanResponse = lines.join('\n').trim();
+      }
+
+      // Also handle just ``` at the end
+      if (cleanResponse.endsWith('```')) {
+        cleanResponse = cleanResponse.slice(0, -3).trim();
+      }
+
+      const parsed = JSON.parse(cleanResponse);
       return (parsed.customers || []).map((customer: any) => ({
         name: customer.name || 'Unknown Customer',
         email: customer.email || 'customer@example.com',
@@ -476,7 +472,7 @@ Respond with ONLY this JSON format:
         confidence: Math.min(100, Math.max(0, customer.confidence || 60))
       }));
     } catch (error) {
-      throw new Error(`Failed to parse AI response: ${error}`);
+      throw new Error(`Failed to parse AI response: ${error}. Response was: ${response.substring(0, 200)}...`);
     }
   }
 

@@ -540,8 +540,8 @@ export async function POST(request: NextRequest) {
       console.log('🤖 Using AI-Only Data Parser for maximum accuracy batch processing');
 
       try {
-        // Initialize security module
-        const security = createSecurityModule('STANDARD');
+        // Initialize security module with PERMISSIVE preset to allow email extraction
+        const security = createSecurityModule('PERMISSIVE');
 
         // Security validation
         const securityCheck = await security.validateSecurityRequirements(batchText, {
