@@ -154,12 +154,12 @@ class AIDataParser {
         }
       }
 
-      // Validate and enhance results
-      const validatedCustomers = await this.validateWithAI(customers);
-      tokensUsed += validatedCustomers.tokensUsed;
+      // Multi-pass validation and enhancement system
+      const enhancedCustomers = await this.multiPassValidation(customers, cleanData);
+      tokensUsed += enhancedCustomers.tokensUsed;
 
       const result: ParseResult = {
-        customers: validatedCustomers.customers,
+        customers: enhancedCustomers.customers,
         formatDetected: formatDetection.format,
         confidence: formatDetection.confidence,
         warnings,
@@ -251,6 +251,237 @@ class AIDataParser {
     const customers = this.parseDataExtractionResponse(response);
 
     return { customers, tokensUsed };
+  }
+
+  /**
+   * Multi-pass validation system for maximum accuracy
+   */
+  private async multiPassValidation(customers: CustomerInfo[], originalData: string): Promise<{
+    customers: CustomerInfo[];
+    tokensUsed: number;
+  }> {
+    if (customers.length === 0) {
+      return { customers, tokensUsed: 0 };
+    }
+
+    let totalTokensUsed = 0;
+    let enhancedCustomers = [...customers];
+
+    // Pass 1: Identify customers with missing critical data
+    const incompleteCustomers = this.identifyIncompleteCustomers(enhancedCustomers);
+
+    if (incompleteCustomers.length > 0) {
+      console.log(`🔍 Found ${incompleteCustomers.length} customers with missing data. Re-checking source...`);
+
+      // Pass 2: Re-extract missing data with targeted prompts
+      for (const incompleteCustomer of incompleteCustomers) {
+        const reCheckResult = await this.reCheckMissingData(incompleteCustomer, originalData);
+        totalTokensUsed += reCheckResult.tokensUsed;
+
+        // Update the customer with re-extracted data
+        const customerIndex = enhancedCustomers.findIndex(c =>
+          c.name === incompleteCustomer.customerData.name &&
+          c.email === incompleteCustomer.customerData.email
+        );
+
+        if (customerIndex !== -1) {
+          enhancedCustomers[customerIndex] = {
+            ...enhancedCustomers[customerIndex],
+            ...reCheckResult.enhancedData
+          };
+        }
+      }
+    }
+
+    // Pass 3: Final validation pass
+    const finalValidation = await this.validateWithAI(enhancedCustomers);
+    totalTokensUsed += finalValidation.tokensUsed;
+
+    return {
+      customers: finalValidation.customers,
+      tokensUsed: totalTokensUsed
+    };
+  }
+
+  /**
+   * Identify customers with missing or incomplete data
+   */
+  private identifyIncompleteCustomers(customers: CustomerInfo[]): Array<{
+    customerData: CustomerInfo;
+    missingFields: string[];
+    confidence: number;
+  }> {
+    const incompleteCustomers = [];
+
+    for (const customer of customers) {
+      const missingFields = [];
+
+      // Check for missing or default values
+      if (!customer.email || customer.email === 'customer@example.com' || customer.email.includes('@missing-email.com')) {
+        missingFields.push('email');
+      }
+
+      if (!customer.phone || customer.phone === '555-000-0000') {
+        missingFields.push('phone');
+      }
+
+      if (!customer.serviceAddress || customer.serviceAddress === 'Address not provided' || customer.serviceAddress.length < 10) {
+        missingFields.push('serviceAddress');
+      }
+
+      if (!customer.installationDate || customer.installationDate === this.getDefaultInstallDate()) {
+        missingFields.push('installationDate');
+      }
+
+      if (!customer.installationTime || customer.installationTime === '10:00 AM') {
+        missingFields.push('installationTime');
+      }
+
+      // Consider low confidence as needing re-check
+      if (customer.confidence < 85 || missingFields.length > 0) {
+        incompleteCustomers.push({
+          customerData: customer,
+          missingFields,
+          confidence: customer.confidence
+        });
+      }
+    }
+
+    return incompleteCustomers;
+  }
+
+  /**
+   * Re-check source data for missing information
+   */
+  private async reCheckMissingData(incompleteCustomer: {
+    customerData: CustomerInfo;
+    missingFields: string[];
+    confidence: number;
+  }, originalData: string): Promise<{
+    enhancedData: Partial<CustomerInfo>;
+    tokensUsed: number;
+  }> {
+    const { customerData, missingFields } = incompleteCustomer;
+
+    const prompt = this.buildReCheckPrompt(customerData, missingFields, originalData);
+
+    const completion = await this.groq.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.01, // Extremely low temperature for re-checking
+      max_tokens: 1000,
+    });
+
+    const response = completion.choices[0]?.message?.content;
+    const tokensUsed = completion.usage?.total_tokens || 0;
+
+    if (response) {
+      const enhancedData = this.parseReCheckResponse(response, missingFields);
+      return { enhancedData, tokensUsed };
+    }
+
+    return { enhancedData: {}, tokensUsed };
+  }
+
+  /**
+   * Build targeted prompt for re-checking missing data
+   */
+  private buildReCheckPrompt(customer: CustomerInfo, missingFields: string[], originalData: string): string {
+    return `CRITICAL RE-CHECK MISSION: Find missing data for customer "${customer.name}"
+
+CUSTOMER CURRENT DATA:
+- Name: ${customer.name}
+- Email: ${customer.email}
+- Phone: ${customer.phone}
+- Address: ${customer.serviceAddress}
+- Install Date: ${customer.installationDate}
+- Install Time: ${customer.installationTime}
+
+MISSING/INCOMPLETE FIELDS: ${missingFields.join(', ')}
+
+INSTRUCTIONS:
+Search the ENTIRE source data below for ANY additional information about "${customer.name}".
+Look for:
+- Complete email addresses (must contain @ and domain)
+- Phone numbers in ANY format: (XXX) XXX-XXXX, XXX-XXX-XXXX, XXX.XXX.XXXX
+- Complete addresses including street, city, state, ZIP
+- Installation dates in ANY format
+- Installation times or time ranges
+
+SOURCE DATA TO RE-EXAMINE:
+${originalData}
+
+SEARCH METHODOLOGY:
+1. Look for the customer name "${customer.name}" in the data
+2. Check lines above and below the name for related information
+3. Look for partial name matches (first name only, last name only)
+4. Check for information that might be associated but not directly adjacent
+5. Look for patterns like email domains that might match
+6. Search for phone number patterns throughout the text
+7. Look for address components that might be on separate lines
+
+Return ONLY found data in JSON format (empty string if not found):
+{
+  "email": "found.email@domain.com or empty string",
+  "phone": "(XXX) XXX-XXXX or empty string",
+  "serviceAddress": "complete address or empty string",
+  "installationDate": "YYYY-MM-DD or empty string",
+  "installationTime": "HH:MM AM/PM or empty string"
+}`;
+  }
+
+  /**
+   * Parse re-check response and extract found data
+   */
+  private parseReCheckResponse(response: string, missingFields: string[]): Partial<CustomerInfo> {
+    try {
+      // Extract JSON from response
+      let cleanResponse = response.trim();
+      const jsonBlockMatch = cleanResponse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (jsonBlockMatch) {
+        cleanResponse = jsonBlockMatch[1].trim();
+      } else {
+        const jsonStart = cleanResponse.indexOf('{');
+        const jsonEnd = cleanResponse.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+          cleanResponse = cleanResponse.substring(jsonStart, jsonEnd + 1);
+        }
+      }
+
+      const parsed = JSON.parse(cleanResponse);
+      const enhancedData: Partial<CustomerInfo> = {};
+
+      // Only use found data (non-empty strings)
+      if (parsed.email && parsed.email.trim() && parsed.email.includes('@') && parsed.email !== '') {
+        enhancedData.email = parsed.email.trim();
+      }
+
+      if (parsed.phone && parsed.phone.trim() && parsed.phone !== '555-000-0000' && parsed.phone !== '') {
+        enhancedData.phone = this.cleanPhoneNumber(parsed.phone);
+      }
+
+      if (parsed.serviceAddress && parsed.serviceAddress.trim() && parsed.serviceAddress.length > 5 && parsed.serviceAddress !== '') {
+        enhancedData.serviceAddress = parsed.serviceAddress.trim();
+      }
+
+      if (parsed.installationDate && parsed.installationDate.trim() && parsed.installationDate !== '') {
+        enhancedData.installationDate = parsed.installationDate.trim();
+      }
+
+      if (parsed.installationTime && parsed.installationTime.trim() && parsed.installationTime !== '') {
+        enhancedData.installationTime = parsed.installationTime.trim();
+      }
+
+      // Increase confidence if we found missing data
+      if (Object.keys(enhancedData).length > 0) {
+        enhancedData.confidence = 95;
+      }
+
+      return enhancedData;
+    } catch (error) {
+      console.log('Re-check parsing failed:', error);
+      return {};
+    }
   }
 
   /**
