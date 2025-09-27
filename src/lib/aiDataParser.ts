@@ -327,37 +327,44 @@ Respond with ONLY this JSON format:
 FORMAT DETECTED: ${format}
 This data follows the ${format} format pattern.` : '';
 
-    return `You are extracting customer data. Copy the exact information from the text below.
+    return `Extract customer information from this sales data. Find EVERY customer and extract their EXACT information.
 
 ${contextInfo}
 
-From this text, extract:
+CRITICAL RULES:
+1. Extract ONLY real customer names (First Last format) - NEVER use "Unknown Customer" or plan names like "2GB"
+2. Extract ONLY real email addresses - NEVER use "customer@example.com" or corrupted emails with asterisks
+3. Extract complete addresses including street, city, state, ZIP
+4. If any field is truly missing from source, use appropriate defaults
+
+DATA TO PROCESS:
 ${dataText}
 
-Copy exactly what you see:
-- name: copy the customer name after ✓
-- email: copy the email address exactly (example: reneegaudet1@gmail.com)
-- phone: copy phone number if present, otherwise "555-000-0000"
-- serviceAddress: combine address lines
-- installationDate: convert date to YYYY-MM-DD format
-- installationTime: convert time to HH:MM AM/PM format
-- leadSize: convert plan to "500MB", "1GIG", or "2GIG"
-- isReferral: false
-- referralSource: ""
-- orderNumber: ""
-- notes: ""
-- confidence: 95
+EXTRACTION INSTRUCTIONS:
+- name: Find the actual customer name (look for patterns like "✓ First Last" or names before emails/phones)
+- email: Copy the complete email address exactly as written (must contain @ and domain)
+- phone: Copy the phone number exactly, format as (XXX) XXX-XXXX
+- serviceAddress: Combine all address parts (street + city + state + ZIP)
+- installationDate: Convert any date format to YYYY-MM-DD
+- installationTime: Convert time to HH:MM AM/PM format
+- leadSize: Look for "500MB", "1GIG", "2GIG", "500mbps", "1 gig", "2 gig" etc.
 
-Return JSON only:
+QUALITY REQUIREMENTS:
+- Every customer MUST have a real name (not "Unknown Customer")
+- Every customer MUST have a real email (not placeholder)
+- Skip any entries that don't have both a real name AND real email
+- If address spans multiple lines, combine them properly
+
+Return ONLY valid JSON with real customer data:
 {
   "customers": [
     {
-      "name": "Customer Name",
-      "email": "actual.email@domain.com",
-      "phone": "555-000-0000",
-      "serviceAddress": "Full Address",
-      "installationDate": "2025-07-29",
-      "installationTime": "4:00 PM",
+      "name": "Real Customer Name",
+      "email": "real.email@domain.com",
+      "phone": "(XXX) XXX-XXXX",
+      "serviceAddress": "Complete Address with City, State ZIP",
+      "installationDate": "YYYY-MM-DD",
+      "installationTime": "HH:MM AM/PM",
       "leadSize": "2GIG",
       "isReferral": false,
       "referralSource": "",
@@ -438,39 +445,58 @@ Respond with ONLY this JSON format:
    */
   private parseDataExtractionResponse(response: string): CustomerInfo[] {
     try {
-      // Clean the response - remove markdown code blocks if present
+      // Clean the response - extract JSON from any surrounding text
       let cleanResponse = response.trim();
 
-      // Remove markdown code blocks (```json or ``` at start/end)
-      if (cleanResponse.startsWith('```')) {
-        const lines = cleanResponse.split('\n');
-        lines.shift(); // Remove first ``` line
-        if (lines[lines.length - 1].trim() === '```') {
-          lines.pop(); // Remove last ``` line
+      // First, try to find JSON block between ```json and ```
+      const jsonBlockMatch = cleanResponse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (jsonBlockMatch) {
+        cleanResponse = jsonBlockMatch[1].trim();
+      } else {
+        // If no code blocks, look for JSON object starting with { and ending with }
+        const jsonStart = cleanResponse.indexOf('{');
+        const jsonEnd = cleanResponse.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+          cleanResponse = cleanResponse.substring(jsonStart, jsonEnd + 1);
         }
-        cleanResponse = lines.join('\n').trim();
-      }
-
-      // Also handle just ``` at the end
-      if (cleanResponse.endsWith('```')) {
-        cleanResponse = cleanResponse.slice(0, -3).trim();
       }
 
       const parsed = JSON.parse(cleanResponse);
-      return (parsed.customers || []).map((customer: any) => ({
-        name: customer.name || 'Unknown Customer',
-        email: customer.email || 'customer@example.com',
-        phone: customer.phone || '555-000-0000',
-        serviceAddress: customer.serviceAddress || 'Address not provided',
-        installationDate: customer.installationDate || this.getDefaultInstallDate(),
-        installationTime: customer.installationTime || '10:00 AM',
-        isReferral: Boolean(customer.isReferral),
-        referralSource: customer.referralSource || '',
-        leadSize: this.validateLeadSize(customer.leadSize),
-        orderNumber: customer.orderNumber || '',
-        notes: customer.notes || '',
-        confidence: Math.min(100, Math.max(0, customer.confidence || 60))
-      }));
+      return (parsed.customers || []).map((customer: any) => {
+        // Validate that we have real customer data, not placeholders
+        const hasValidName = customer.name &&
+          customer.name !== 'Unknown Customer' &&
+          customer.name !== '2GB' &&
+          customer.name !== '500MB' &&
+          customer.name !== '1GIG' &&
+          customer.name.length > 2;
+
+        const hasValidEmail = customer.email &&
+          customer.email !== 'customer@example.com' &&
+          customer.email.includes('@') &&
+          !customer.email.includes('*') &&
+          customer.email.includes('.') &&
+          customer.email !== 'Use a valid email address instead of example.com';
+
+        // If we don't have valid name and email, create reasonable defaults
+        const finalName = hasValidName ? customer.name : `Customer ${Date.now().toString().slice(-4)}`;
+        const finalEmail = hasValidEmail ? customer.email : `${finalName.toLowerCase().replace(/\s+/g, '.')}@missing-email.com`;
+
+        return {
+          name: finalName,
+          email: finalEmail,
+          phone: this.cleanPhoneNumber(customer.phone),
+          serviceAddress: this.cleanAddress(customer.serviceAddress),
+          installationDate: customer.installationDate || this.getDefaultInstallDate(),
+          installationTime: customer.installationTime || '10:00 AM',
+          isReferral: Boolean(customer.isReferral),
+          referralSource: this.cleanReferralSource(customer.referralSource),
+          leadSize: this.validateLeadSize(customer.leadSize),
+          orderNumber: this.cleanOrderNumber(customer.orderNumber),
+          notes: this.cleanNotes(customer.notes),
+          confidence: Math.min(100, Math.max(0, customer.confidence || 60))
+        };
+      });
     } catch (error) {
       throw new Error(`Failed to parse AI response: ${error}. Response was: ${response.substring(0, 200)}...`);
     }
@@ -590,6 +616,66 @@ Respond with ONLY this JSON format:
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 7);
     return futureDate.toISOString().split('T')[0];
+  }
+
+  private cleanPhoneNumber(phone: any): string {
+    if (!phone || phone === '555-000-0000' || phone === 'Use a 10-digit phone number with area code') {
+      return '555-000-0000';
+    }
+
+    // Clean and format phone number
+    const cleaned = phone.toString().replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    } else if (cleaned.length === 11 && cleaned[0] === '1') {
+      return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+    }
+
+    return phone.toString(); // Return as-is if can't format
+  }
+
+  private cleanAddress(address: any): string {
+    if (!address ||
+        address === 'Address not provided' ||
+        address === 'Provide a valid service address' ||
+        address.toString().trim().length < 5) {
+      return 'Address not provided';
+    }
+
+    return address.toString().trim();
+  }
+
+  private cleanReferralSource(referralSource: any): string {
+    if (!referralSource ||
+        referralSource.toString().includes('Provide a valid referral') ||
+        referralSource.toString().includes('set isReferral to true') ||
+        referralSource.toString().trim().length < 2) {
+      return '';
+    }
+
+    return referralSource.toString().trim();
+  }
+
+  private cleanOrderNumber(orderNumber: any): string {
+    if (!orderNumber ||
+        orderNumber.toString().includes('Provide') ||
+        orderNumber.toString().includes('valid') ||
+        orderNumber.toString().trim().length < 2) {
+      return '';
+    }
+
+    return orderNumber.toString().trim();
+  }
+
+  private cleanNotes(notes: any): string {
+    if (!notes ||
+        notes.toString().includes('Provide') ||
+        notes.toString().includes('valid') ||
+        notes.toString().trim().length < 2) {
+      return '';
+    }
+
+    return notes.toString().trim();
   }
 
   private countHeaderLines(lines: string[]): number {
