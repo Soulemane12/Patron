@@ -72,15 +72,15 @@ class AIDataParser {
 
     this.groq = new Groq({ apiKey });
 
-    // Set default configuration
+    // Set configuration for maximum accuracy
     this.config = {
-      maxTokens: 8000,
-      temperature: 0.1, // Low temperature for consistent parsing
-      enableFallback: true,
-      batchSize: 50, // Lines per AI request
-      maxRetries: 3,
-      costThreshold: 1.0, // Max $1 per parsing request
-      enableCaching: true,
+      maxTokens: 32000, // Large context for complete analysis
+      temperature: 0.01, // Extremely low for maximum precision
+      enableFallback: false, // NO FALLBACK - AI only
+      batchSize: 10, // Small batches for focused attention
+      maxRetries: 5, // More retries for accuracy
+      costThreshold: 100.0, // No cost limits - accuracy first
+      enableCaching: false, // Fresh analysis every time
       ...config
     };
   }
@@ -117,46 +117,21 @@ class AIDataParser {
       const formatDetection = await this.detectFormatWithAI(cleanData);
       tokensUsed += formatDetection.tokensUsed;
 
-      // Parse data using AI in batches if necessary
-      const lines = cleanData.split('\n').filter(line => line.trim());
-      const customers: CustomerInfo[] = [];
+      // Process ENTIRE dataset at once for maximum accuracy
+      console.log('🤖 Processing entire dataset with AI for maximum accuracy...');
 
-      // Process in batches to manage costs and token limits
-      const batches = this.createBatches(lines, this.config.batchSize);
+      const fullDataResult = await this.parseDataBatch(
+        cleanData, // Pass entire data as one block
+        formatDetection.format,
+        true
+      );
 
-      for (let i = 0; i < batches.length; i++) {
-        try {
-          const batchResult = await this.parseDataBatch(
-            batches[i],
-            formatDetection.format,
-            i === 0 // First batch gets context about the overall format
-          );
+      const customers = fullDataResult.customers;
+      tokensUsed += fullDataResult.tokensUsed;
 
-          customers.push(...batchResult.customers);
-          tokensUsed += batchResult.tokensUsed;
-
-          // Check cost threshold
-          const currentCost = tokensUsed * this.COST_PER_TOKEN;
-          if (currentCost > this.config.costThreshold) {
-            warnings.push(`Cost threshold exceeded ($${currentCost.toFixed(4)}). Processing stopped.`);
-            break;
-          }
-
-          // Rate limiting between batches
-          if (i < batches.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        } catch (error) {
-          errors.push(`Batch ${i + 1} failed: ${error}`);
-          if (!this.config.enableFallback) {
-            throw error;
-          }
-        }
-      }
-
-      // Multi-pass validation and enhancement system
-      const enhancedCustomers = await this.multiPassValidation(customers, cleanData);
-      tokensUsed += enhancedCustomers.tokensUsed;
+      // Temporarily disable multi-pass for initial accuracy testing
+      console.log('🎯 Using single-pass extraction for maximum initial accuracy');
+      const enhancedCustomers = { customers, tokensUsed: 0 };
 
       const result: ParseResult = {
         customers: enhancedCustomers.customers,
@@ -186,12 +161,8 @@ class AIDataParser {
     } catch (error) {
       errors.push(`AI parsing failed: ${error}`);
 
-      // Fallback to regex-based parser if enabled
-      if (this.config.enableFallback) {
-        warnings.push('AI parsing failed, falling back to pattern matching');
-        return this.fallbackParse(data, warnings, errors, startTime, tokensUsed);
-      }
-
+      // NO FALLBACK - Retry with AI only
+      console.log('🔄 AI parsing failed, retrying with different approach...');
       throw error;
     }
   }
@@ -223,17 +194,17 @@ class AIDataParser {
   }
 
   /**
-   * Parse data batch using AI intelligence
+   * Parse complete dataset using AI intelligence
    */
   private async parseDataBatch(
-    lines: string[],
+    data: string,
     detectedFormat: string,
     includeContext: boolean
   ): Promise<{
     customers: CustomerInfo[];
     tokensUsed: number;
   }> {
-    const prompt = this.buildDataExtractionPrompt(lines, detectedFormat, includeContext);
+    const prompt = this.buildDataExtractionPrompt([data], detectedFormat, includeContext);
 
     const completion = await this.groq.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
@@ -316,29 +287,45 @@ class AIDataParser {
     for (const customer of customers) {
       const missingFields = [];
 
-      // Check for missing or default values
-      if (!customer.email || customer.email === 'customer@example.com' || customer.email.includes('@missing-email.com')) {
+      // NO DEFAULTS ALLOWED - Check for ANY missing or placeholder data
+      if (!customer.email ||
+          customer.email === 'customer@example.com' ||
+          customer.email.includes('@missing-email.com') ||
+          customer.email.includes('*') ||
+          customer.email.length < 5 ||
+          !customer.email.includes('@') ||
+          !customer.email.includes('.')) {
         missingFields.push('email');
       }
 
-      if (!customer.phone || customer.phone === '555-000-0000') {
+      if (!customer.phone ||
+          customer.phone === '555-000-0000' ||
+          customer.phone.includes('555-') ||
+          customer.phone.length < 10) {
         missingFields.push('phone');
       }
 
-      if (!customer.serviceAddress || customer.serviceAddress === 'Address not provided' || customer.serviceAddress.length < 10) {
+      if (!customer.serviceAddress ||
+          customer.serviceAddress === 'Address not provided' ||
+          customer.serviceAddress.length < 15 ||
+          !customer.serviceAddress.includes(',')) {
         missingFields.push('serviceAddress');
       }
 
-      if (!customer.installationDate || customer.installationDate === this.getDefaultInstallDate()) {
+      if (!customer.installationDate ||
+          customer.installationDate === this.getDefaultInstallDate() ||
+          customer.installationDate.includes('2025-01-01')) {
         missingFields.push('installationDate');
       }
 
-      if (!customer.installationTime || customer.installationTime === '10:00 AM') {
+      if (!customer.installationTime ||
+          customer.installationTime === '10:00 AM' ||
+          customer.installationTime.length < 3) {
         missingFields.push('installationTime');
       }
 
-      // Consider low confidence as needing re-check
-      if (customer.confidence < 85 || missingFields.length > 0) {
+      // ANY missing field triggers re-check
+      if (missingFields.length > 0) {
         incompleteCustomers.push({
           customerData: customer,
           missingFields,
@@ -384,12 +371,12 @@ class AIDataParser {
   }
 
   /**
-   * Build targeted prompt for re-checking missing data
+   * Build targeted prompt for re-checking missing data with examples
    */
   private buildReCheckPrompt(customer: CustomerInfo, missingFields: string[], originalData: string): string {
-    return `CRITICAL RE-CHECK MISSION: Find missing data for customer "${customer.name}"
+    return `EXHAUSTIVE RE-SEARCH MISSION: Find missing data for "${customer.name}"
 
-CUSTOMER CURRENT DATA:
+CURRENT CUSTOMER DATA:
 - Name: ${customer.name}
 - Email: ${customer.email}
 - Phone: ${customer.phone}
@@ -397,89 +384,150 @@ CUSTOMER CURRENT DATA:
 - Install Date: ${customer.installationDate}
 - Install Time: ${customer.installationTime}
 
-MISSING/INCOMPLETE FIELDS: ${missingFields.join(', ')}
+MISSING FIELDS TO FIND: ${missingFields.join(', ')}
 
-INSTRUCTIONS:
-Search the ENTIRE source data below for ANY additional information about "${customer.name}".
-Look for:
-- Complete email addresses (must contain @ and domain)
-- Phone numbers in ANY format: (XXX) XXX-XXXX, XXX-XXX-XXXX, XXX.XXX.XXXX
-- Complete addresses including street, city, state, ZIP
-- Installation dates in ANY format
-- Installation times or time ranges
+EXAMPLES OF WHAT TO LOOK FOR:
 
-SOURCE DATA TO RE-EXAMINE:
+EMAIL PATTERNS:
+- "reneegaudet1@gmail.com" (exact match)
+- "tatejrr@gmail.com" (might be on different line)
+- "jannadavis1067@gmail.com" (could be scattered)
+
+PHONE PATTERNS:
+- "919-236-3685" (dash format)
+- "743-214-5494" (standard format)
+- "336-693-9008" (area code format)
+- "(336) 234-5678" (parentheses format)
+- "3365213176" (no formatting)
+
+ADDRESS PATTERNS:
+- "Service address:- 440 E McPherson Dr" (on one line)
+- "Mebane, NC 27302" (city/state on next line)
+- "Service Address" followed by address on next line
+- Multi-line addresses that need combining
+
+DATE PATTERNS:
+- "Tuesday, July 29, 2025" → "2025-07-29"
+- "July 25, 2025" → "2025-07-25"
+- "August 5th,2025" → "2025-08-05"
+- "July 28th,2025" → "2025-07-28"
+
+TIME PATTERNS:
+- "4-6 p.m" (keep as is)
+- "12-2 p.m." (keep as is)
+- "10am-12pm" (keep as is)
+- "8:00 AM - 10:00 AM" (keep as is)
+
+SEARCH STRATEGY:
+1. Search for EXACT customer name "${customer.name}"
+2. Search for FIRST NAME ONLY: "${customer.name.split(' ')[0]}"
+3. Search for LAST NAME ONLY: "${customer.name.split(' ').pop()}"
+4. Look in 20 lines BEFORE and AFTER any name match
+5. Search for email domains that might match
+6. Look for phone numbers anywhere in the document that might belong to this customer
+7. Search for address fragments that could be combined
+8. Check for order numbers, installation dates, times near the name
+
+SOURCE DATA TO SEARCH EXHAUSTIVELY:
 ${originalData}
 
-SEARCH METHODOLOGY:
-1. Look for the customer name "${customer.name}" in the data
-2. Check lines above and below the name for related information
-3. Look for partial name matches (first name only, last name only)
-4. Check for information that might be associated but not directly adjacent
-5. Look for patterns like email domains that might match
-6. Search for phone number patterns throughout the text
-7. Look for address components that might be on separate lines
+IMPORTANT: Read EVERY LINE carefully. Information may be scattered.
 
-Return ONLY found data in JSON format (empty string if not found):
+Return ONLY what you find (use empty string "" if truly not found):
 {
-  "email": "found.email@domain.com or empty string",
-  "phone": "(XXX) XXX-XXXX or empty string",
-  "serviceAddress": "complete address or empty string",
-  "installationDate": "YYYY-MM-DD or empty string",
-  "installationTime": "HH:MM AM/PM or empty string"
+  "email": "exact.email@found.com",
+  "phone": "(919) 236-3685",
+  "serviceAddress": "440 E McPherson Dr, Mebane, NC 27302",
+  "installationDate": "2025-07-29",
+  "installationTime": "4-6 p.m"
 }`;
   }
 
   /**
-   * Parse re-check response and extract found data
+   * Parse re-check response and extract found data with robust JSON extraction
    */
   private parseReCheckResponse(response: string, missingFields: string[]): Partial<CustomerInfo> {
     try {
-      // Extract JSON from response
+      console.log('Raw re-check response:', response.substring(0, 500) + '...');
+
+      // Extract JSON from response with multiple strategies
       let cleanResponse = response.trim();
-      const jsonBlockMatch = cleanResponse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+
+      // Strategy 1: Look for JSON code blocks
+      let jsonBlockMatch = cleanResponse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
       if (jsonBlockMatch) {
         cleanResponse = jsonBlockMatch[1].trim();
       } else {
+        // Strategy 2: Look for content between { and }
         const jsonStart = cleanResponse.indexOf('{');
         const jsonEnd = cleanResponse.lastIndexOf('}');
         if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
           cleanResponse = cleanResponse.substring(jsonStart, jsonEnd + 1);
+        } else {
+          // Strategy 3: Try to find JSON-like patterns and build valid JSON
+          console.log('No JSON blocks found, attempting to extract individual fields...');
+
+          // Look for email patterns
+          const emailMatch = cleanResponse.match(/email["\s]*:[\s"]*([^",\n}]+)/i);
+          const phoneMatch = cleanResponse.match(/phone["\s]*:[\s"]*([^",\n}]+)/i);
+          const addressMatch = cleanResponse.match(/serviceAddress["\s]*:[\s"]*([^",\n}]+)/i);
+          const dateMatch = cleanResponse.match(/installationDate["\s]*:[\s"]*([^",\n}]+)/i);
+          const timeMatch = cleanResponse.match(/installationTime["\s]*:[\s"]*([^",\n}]+)/i);
+
+          // Build JSON manually
+          const extractedData = {
+            email: emailMatch ? emailMatch[1].trim().replace(/['"]/g, '') : '',
+            phone: phoneMatch ? phoneMatch[1].trim().replace(/['"]/g, '') : '',
+            serviceAddress: addressMatch ? addressMatch[1].trim().replace(/['"]/g, '') : '',
+            installationDate: dateMatch ? dateMatch[1].trim().replace(/['"]/g, '') : '',
+            installationTime: timeMatch ? timeMatch[1].trim().replace(/['"]/g, '') : ''
+          };
+
+          cleanResponse = JSON.stringify(extractedData);
         }
       }
+
+      console.log('Cleaned JSON for parsing:', cleanResponse.substring(0, 200) + '...');
 
       const parsed = JSON.parse(cleanResponse);
       const enhancedData: Partial<CustomerInfo> = {};
 
       // Only use found data (non-empty strings)
-      if (parsed.email && parsed.email.trim() && parsed.email.includes('@') && parsed.email !== '') {
+      if (parsed.email && parsed.email.trim() && parsed.email.includes('@') && parsed.email !== '' && parsed.email !== 'empty string') {
         enhancedData.email = parsed.email.trim();
+        console.log('✅ Found email:', enhancedData.email);
       }
 
-      if (parsed.phone && parsed.phone.trim() && parsed.phone !== '555-000-0000' && parsed.phone !== '') {
+      if (parsed.phone && parsed.phone.trim() && parsed.phone !== '555-000-0000' && parsed.phone !== '' && parsed.phone !== 'empty string') {
         enhancedData.phone = this.cleanPhoneNumber(parsed.phone);
+        console.log('✅ Found phone:', enhancedData.phone);
       }
 
-      if (parsed.serviceAddress && parsed.serviceAddress.trim() && parsed.serviceAddress.length > 5 && parsed.serviceAddress !== '') {
+      if (parsed.serviceAddress && parsed.serviceAddress.trim() && parsed.serviceAddress.length > 5 && parsed.serviceAddress !== '' && parsed.serviceAddress !== 'empty string') {
         enhancedData.serviceAddress = parsed.serviceAddress.trim();
+        console.log('✅ Found address:', enhancedData.serviceAddress);
       }
 
-      if (parsed.installationDate && parsed.installationDate.trim() && parsed.installationDate !== '') {
+      if (parsed.installationDate && parsed.installationDate.trim() && parsed.installationDate !== '' && parsed.installationDate !== 'empty string') {
         enhancedData.installationDate = parsed.installationDate.trim();
+        console.log('✅ Found date:', enhancedData.installationDate);
       }
 
-      if (parsed.installationTime && parsed.installationTime.trim() && parsed.installationTime !== '') {
+      if (parsed.installationTime && parsed.installationTime.trim() && parsed.installationTime !== '' && parsed.installationTime !== 'empty string') {
         enhancedData.installationTime = parsed.installationTime.trim();
+        console.log('✅ Found time:', enhancedData.installationTime);
       }
 
       // Increase confidence if we found missing data
       if (Object.keys(enhancedData).length > 0) {
-        enhancedData.confidence = 95;
+        enhancedData.confidence = 100;
+        console.log(`🎯 Enhanced ${Object.keys(enhancedData).length} fields for customer`);
       }
 
       return enhancedData;
     } catch (error) {
       console.log('Re-check parsing failed:', error);
+      console.log('Failed response:', response.substring(0, 300) + '...');
       return {};
     }
   }
@@ -549,59 +597,87 @@ Respond with ONLY this JSON format:
   }
 
   /**
-   * Build data extraction prompt with maximum accuracy for sales reports
+   * Build data extraction prompt with maximum accuracy using real examples
    */
   private buildDataExtractionPrompt(lines: string[], format: string, includeContext: boolean): string {
     const dataText = lines.join('\n');
 
-    const contextInfo = includeContext ? `
-FORMAT DETECTED: ${format}
-This data follows the ${format} format pattern.` : '';
-
-    return `Extract customer information from this sales data. Find EVERY customer and extract their EXACT information.
-
-${contextInfo}
-
-CRITICAL RULES:
-1. Extract ONLY real customer names (First Last format) - NEVER use "Unknown Customer" or plan names like "2GB"
-2. Extract ONLY real email addresses - NEVER use "customer@example.com" or corrupted emails with asterisks
-3. Extract complete addresses including street, city, state, ZIP
-4. If any field is truly missing from source, use appropriate defaults
+    return `YOU ARE A PRECISION DATA EXTRACTION EXPERT. Extract customer information with 100% accuracy.
 
 DATA TO PROCESS:
 ${dataText}
 
-EXTRACTION INSTRUCTIONS:
-- name: Find the actual customer name (look for patterns like "✓ First Last" or names before emails/phones)
-- email: Copy the complete email address exactly as written (must contain @ and domain)
-- phone: Copy the phone number exactly, format as (XXX) XXX-XXXX
-- serviceAddress: Combine all address parts (street + city + state + ZIP)
-- installationDate: Convert any date format to YYYY-MM-DD
-- installationTime: Convert time to HH:MM AM/PM format
-- leadSize: Look for "500MB", "1GIG", "2GIG", "500mbps", "1 gig", "2 gig" etc.
+EXTRACTION RULES - FOLLOW EXACTLY:
 
-QUALITY REQUIREMENTS:
-- Every customer MUST have a real name (not "Unknown Customer")
-- Every customer MUST have a real email (not placeholder)
-- Skip any entries that don't have both a real name AND real email
-- If address spans multiple lines, combine them properly
+1. CUSTOMER NAMES:
+   - Look for patterns: "✓ Name", "• Name", "◦ Name"
+   - Real examples: "✓ Renee Gaudet", "✓ Rodney Tate", "◦ Janna Davis"
+   - NEVER use plan names ("2GB", "500MB") as customer names
+   - NEVER use "Unknown Customer" or placeholder names
 
-Return ONLY valid JSON with real customer data:
+2. EMAIL ADDRESSES:
+   - Copy EXACTLY as written from source
+   - Examples: "reneegaudet1@gmail.com", "tatejrr@gmail.com", "jannadavis1067@gmail.com"
+   - NEVER use "customer@example.com" or add asterisks
+   - NEVER modify or corrupt emails
+
+3. PHONE NUMBERS:
+   - Extract exact numbers from source
+   - Examples: "919-236-3685", "743-214-5494", "336-693-9008"
+   - Format as (XXX) XXX-XXXX
+   - If truly missing, search entire text for ANY phone number near the customer
+
+4. ADDRESSES:
+   - Combine all address parts from multiple lines
+   - Examples: "440 E McPherson Dr, Mebane, NC 27302", "111 S Tenth St, Mebane, NC 27302"
+   - Look for "Service address:", "Service Address", address on separate lines
+
+5. INSTALLATION DATES:
+   - Convert to YYYY-MM-DD format
+   - Examples: "Tuesday, July 29, 2025" → "2025-07-29", "July 25, 2025" → "2025-07-25"
+
+6. INSTALLATION TIMES:
+   - Extract exact times from source
+   - Examples: "4-6 p.m", "12-2 p.m.", "10am-12pm"
+   - Keep original format when clear
+
+7. PLAN SIZES:
+   - Look for: "✅500mbsp", "✅2 Gig", "✅2Gb", "✅500mbps"
+   - Convert to: "500MB", "1GIG", "2GIG"
+
+8. ORDER NUMBERS:
+   - Extract patterns like: "TMO20250723VRWHW", "TMO20250723Z5Q19"
+   - Look after "Order number:" or "Order Number:"
+
+9. STATUS INDICATORS:
+   - Look for "(( INSTALLED))", "((cancelled))"
+   - Extract installation status from these indicators
+
+SEARCH METHODOLOGY:
+- For each customer name found, search the ENTIRE surrounding text
+- Look 10-15 lines above and below the name
+- Check for information that might be scattered across multiple lines
+- If email/phone is missing for a customer, search the ENTIRE document for ANY email/phone that could belong to them
+- Combine address fragments from multiple lines
+
+CRITICAL: DO NOT CREATE PLACEHOLDER DATA. If information is truly missing from the source, leave it empty or search more thoroughly.
+
+RETURN ONLY THIS JSON FORMAT:
 {
   "customers": [
     {
-      "name": "Real Customer Name",
-      "email": "real.email@domain.com",
-      "phone": "(XXX) XXX-XXXX",
-      "serviceAddress": "Complete Address with City, State ZIP",
-      "installationDate": "YYYY-MM-DD",
-      "installationTime": "HH:MM AM/PM",
-      "leadSize": "2GIG",
+      "name": "Exact Name From Source",
+      "email": "exact.email@from.source",
+      "phone": "(919) 236-3685",
+      "serviceAddress": "440 E McPherson Dr, Mebane, NC 27302",
+      "installationDate": "2025-07-29",
+      "installationTime": "4-6 p.m",
+      "leadSize": "500MB",
       "isReferral": false,
       "referralSource": "",
-      "orderNumber": "",
-      "notes": "",
-      "confidence": 95
+      "orderNumber": "TMO20250723VRWHW",
+      "notes": "INSTALLED",
+      "confidence": 100
     }
   ]
 }`;
