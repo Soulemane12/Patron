@@ -158,7 +158,7 @@ export async function runAIParserDemo() {
   console.log('✅ Groq API key found - starting demo...\n');
 
   // Initialize security module
-  const security = createSecurityModule(SECURITY_PRESETS.STANDARD);
+  const security = createSecurityModule('STANDARD');
 
   for (const [formatName, sampleData] of Object.entries(DEMO_DATA)) {
     console.log(`\n📋 Testing: ${formatName}`);

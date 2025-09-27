@@ -520,7 +520,7 @@ export async function POST(request: NextRequest) {
 
       try {
         // Initialize security module
-        const security = createSecurityModule(SECURITY_PRESETS.STANDARD);
+        const security = createSecurityModule('STANDARD');
 
         // Security validation
         const securityCheck = await security.validateSecurityRequirements(batchText, {
