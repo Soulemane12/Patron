@@ -96,51 +96,69 @@ export async function POST(request: NextRequest) {
 
     // Generate a cache key based on the input text
     const cacheKey = text.trim().toLowerCase().replace(/\s+/g, ' ');
-    
+
     // Check if we have a cached result
     if (customerCache.has(cacheKey)) {
       return NextResponse.json(customerCache.get(cacheKey));
     }
 
-    // First try to extract information using regex patterns
-    const regexResult = extractCustomerInfo(text);
-    
-    // Check if we got enough information from regex
-    const hasEnoughInfo = 
-      regexResult.name !== 'Not provided' && 
-      regexResult.phone !== 'Not provided' && 
-      regexResult.installationDate !== 'Not provided';
-    
+    console.log('🤖 Using AI-Only for single customer formatting (maximum accuracy)');
+
     let formattedData: any;
-    
-    // If regex extraction was successful, use it
-    if (hasEnoughInfo) {
-      formattedData = regexResult;
-    } 
-    // Otherwise, fall back to the AI model
-    else if (process.env.GROQ_API_KEY) {
+
+    // AI-ONLY processing for maximum accuracy
+    if (process.env.GROQ_API_KEY) {
       const completion = await groq.chat.completions.create({
         messages: [
           {
             role: 'system',
-            content: `You are a customer information formatter. Extract and format customer information from the provided text into a structured format. Always return a valid JSON object with the following fields:
-- name: The customer's full name
-- email: The customer's email address
-- phone: The customer's phone number
-- serviceAddress: The complete service address
-- installationDate: The installation date in a readable format
-- installationTime: The installation time in a readable format
+            content: `YOU ARE A PRECISION CUSTOMER DATA EXTRACTION EXPERT. Extract customer information with 100% accuracy.
 
-If any information is missing, use "Not provided" as the value. Ensure the JSON is properly formatted and valid. Only return the JSON object, no additional text.`
+EXTRACTION RULES - FOLLOW EXACTLY:
+
+1. CUSTOMER NAMES:
+   - Look for patterns: "✓ Name", "• Name", "◦ Name", or standalone names
+   - Real examples: "✓ Renee Gaudet", "✓ Rodney Tate", "◦ Janna Davis"
+   - NEVER use placeholder names
+
+2. EMAIL ADDRESSES:
+   - Copy EXACTLY as written from source
+   - Examples: "reneegaudet1@gmail.com", "tatejrr@gmail.com", "jannadavis1067@gmail.com"
+   - NEVER modify or add asterisks
+
+3. PHONE NUMBERS:
+   - Extract exact numbers: "919-236-3685", "743-214-5494", "336-693-9008"
+   - Format as (XXX) XXX-XXXX
+
+4. ADDRESSES:
+   - Combine all address parts: "440 E McPherson Dr, Mebane, NC 27302"
+   - Look for "Service address:", "Service Address", or address on separate lines
+
+5. INSTALLATION DATES:
+   - Convert to YYYY-MM-DD format
+   - Examples: "Tuesday, July 29, 2025" → "2025-07-29"
+
+6. INSTALLATION TIMES:
+   - Keep original format: "4-6 p.m", "12-2 p.m.", "10am-12pm"
+
+RETURN ONLY JSON - NO OTHER TEXT:
+{
+  "name": "Exact Name From Source",
+  "email": "exact.email@domain.com",
+  "phone": "(919) 236-3685",
+  "serviceAddress": "440 E McPherson Dr, Mebane, NC 27302",
+  "installationDate": "2025-07-29",
+  "installationTime": "4-6 p.m"
+}`
           },
           {
             role: 'user',
-            content: `Please format the following customer information into structured data:\n\n${text}`
+            content: `Extract customer information with maximum accuracy:\n\n${text}`
           }
         ],
         model: 'llama-3.3-70b-versatile',
-        temperature: 0.1,
-        max_tokens: 500,
+        temperature: 0.01, // Maximum precision
+        max_tokens: 1000,
       });
 
       const responseContent = completion.choices[0]?.message?.content;
@@ -149,17 +167,27 @@ If any information is missing, use "Not provided" as the value. Ensure the JSON 
         throw new Error('No response from Groq API');
       }
 
-      // Try to parse the JSON response
+      // Enhanced JSON parsing with multiple strategies
       try {
-        // Extract JSON from the response (in case there's extra text)
-        const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          formattedData = JSON.parse(jsonMatch[0]);
+        let cleanResponse = responseContent.trim();
+
+        // Strategy 1: Look for JSON code blocks
+        const jsonBlockMatch = cleanResponse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+        if (jsonBlockMatch) {
+          cleanResponse = jsonBlockMatch[1].trim();
         } else {
-          formattedData = JSON.parse(responseContent);
+          // Strategy 2: Extract content between { and }
+          const jsonStart = cleanResponse.indexOf('{');
+          const jsonEnd = cleanResponse.lastIndexOf('}');
+          if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+            cleanResponse = cleanResponse.substring(jsonStart, jsonEnd + 1);
+          }
         }
+
+        formattedData = JSON.parse(cleanResponse);
+        console.log('✅ AI extraction successful for single customer');
       } catch (parseError) {
-        console.error('Failed to parse JSON response:', responseContent);
+        console.error('Failed to parse AI JSON response:', responseContent);
         throw new Error('Invalid response format from AI');
       }
 
@@ -194,8 +222,7 @@ If any information is missing, use "Not provided" as the value. Ensure the JSON 
         }
       }
     } else {
-      // If GROQ API key is not available and regex didn't work well
-      formattedData = regexResult;
+      throw new Error('GROQ_API_KEY not configured - AI-only operation required');
     }
 
     // Store the result in cache
@@ -203,13 +230,24 @@ If any information is missing, use "Not provided" as the value. Ensure the JSON 
 
     return NextResponse.json(formattedData);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error formatting customer information:', error);
-    
+
+    // Handle rate limit errors specifically
+    if (error.status === 429 || error.message?.includes('rate_limit_exceeded')) {
+      return NextResponse.json({
+        error: 'Rate limit exceeded',
+        message: error.message,
+        type: 'rate_limit',
+        suggestion: 'Please wait before trying again or upgrade your API plan for higher limits.'
+      }, { status: 429 });
+    }
+
     return NextResponse.json(
-      { 
-        error: 'Failed to format customer information',
-        details: error instanceof Error ? error.message : 'Unknown error'
+      {
+        error: 'AI formatting failed. System configured for AI-only operation.',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        type: 'ai_formatting_error'
       },
       { status: 500 }
     );
