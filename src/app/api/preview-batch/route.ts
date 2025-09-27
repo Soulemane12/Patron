@@ -39,7 +39,17 @@ function parseAndFormatDate(dateStr: string): string {
 
     const cleanDate = dateStr.toLowerCase().trim();
 
-    // Match pattern like "jul 26, 2025"
+    // Handle "Tuesday, July 29, 2025" format
+    const dayMonthYearMatch = cleanDate.match(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+(\w+)\s+(\d{1,2}),?\s+(\d{4})/i);
+    if (dayMonthYearMatch) {
+      const [, monthName, day, year] = dayMonthYearMatch;
+      const monthNum = monthMap[monthName];
+      if (monthNum) {
+        return `${year}-${monthNum}-${day.padStart(2, '0')}`;
+      }
+    }
+
+    // Match pattern like "jul 26, 2025" or "July 25, 2025"
     const monthDayYearMatch = cleanDate.match(/(\w{3,})\s+(\d{1,2}),?\s+(\d{4})/);
     if (monthDayYearMatch) {
       const [, monthName, day, year] = monthDayYearMatch;
@@ -85,7 +95,7 @@ function parseSalesReport(batchText: string): CustomerInfo[] {
     }
 
     // Look for customer name patterns (starting with checkmarks or bullets)
-    if (line.match(/^[✓◦•]\s+(.+)/) || (line.includes('@') && !line.includes('Service address:') && !line.includes('Order number:'))) {
+    if (line.match(/^[✓◦•]\s+(.+)/)) {
       // If we have a previous customer, save it
       if (currentCustomer.name && (currentCustomer.email || currentCustomer.phone || currentCustomer.serviceAddress)) {
         customers.push(completeCustomer(currentCustomer));
@@ -101,14 +111,6 @@ function parseSalesReport(batchText: string): CustomerInfo[] {
         currentCustomer.name = nameMatch[1].replace(/[✅💰]/g, '').trim();
       }
 
-      // Check if email is on the same line
-      if (line.includes('@')) {
-        const emailMatch = line.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-        if (emailMatch) {
-          currentCustomer.email = emailMatch[1];
-        }
-      }
-
       continue;
     }
 
@@ -121,52 +123,90 @@ function parseSalesReport(batchText: string): CustomerInfo[] {
         }
       }
 
-      // Extract phone number
-      if (!currentCustomer.phone && line.match(/\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/)) {
-        const phoneMatch = line.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/);
+      // Extract phone number (more flexible patterns)
+      if (!currentCustomer.phone) {
+        const phoneMatch = line.match(/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/);
         if (phoneMatch) {
           currentCustomer.phone = phoneMatch[1];
         }
       }
 
-      // Extract service address
-      if (line.includes('Service address:') || line.includes('Service Address:')) {
-        const addressMatch = line.match(/Service [Aa]ddress:[-\s]*(.+)/);
-        if (addressMatch) {
-          currentCustomer.serviceAddress = addressMatch[1].trim();
+      // Extract service address - enhanced multi-line extraction
+      if (!currentCustomer.serviceAddress) {
+        if (line.includes('Service address:') || line.includes('Service Address:')) {
+          const addressMatch = line.match(/Service [Aa]ddress:[-\s]*(.+)/);
+          if (addressMatch) {
+            currentCustomer.serviceAddress = addressMatch[1].trim();
+            // Look ahead for additional address lines (city, state, zip)
+            if (i + 1 < lines.length) {
+              const nextLine = lines[i + 1].trim();
+              if (nextLine && !nextLine.match(/^[✓◦•]/) && !nextLine.includes('@') && !nextLine.includes('Installation') && !nextLine.includes('Order number') && nextLine.match(/^[A-Za-z\s]+,\s+[A-Z]{2}\s+\d{5}/)) {
+                currentCustomer.serviceAddress += `, ${nextLine}`;
+              }
+            }
+          }
+        } else if (line.match(/^\d+\s+[A-Za-z]/) && !line.includes('@') && !line.includes('Installation')) {
+          // Standalone address line starting with number
+          currentCustomer.serviceAddress = line.trim();
+          // Look ahead for city, state, zip
+          if (i + 1 < lines.length) {
+            const nextLine = lines[i + 1].trim();
+            if (nextLine.match(/^[A-Za-z\s]+,\s+[A-Z]{2}\s+\d{5}/)) {
+              currentCustomer.serviceAddress += `, ${nextLine}`;
+            }
+          }
         }
       }
 
-      // Extract installation date
-      if ((line.includes('Installation') || line.includes('Install')) && (line.includes('Date') || line.includes('date'))) {
-        const dateMatch = line.match(/(?:Installation|Install)\s*[Dd]ate:[-\s]*(.+)/);
-        if (dateMatch) {
-          currentCustomer.installationDate = parseAndFormatDate(dateMatch[1].trim());
+      // Extract installation date - enhanced pattern matching
+      if (!currentCustomer.installationDate) {
+        if (line.includes('Installation') || line.includes('Install')) {
+          const dateMatch = line.match(/(?:Installation|Install)(?:\s*[Dd]ate)?:?[-\s]*(.+)/);
+          if (dateMatch) {
+            currentCustomer.installationDate = parseAndFormatDate(dateMatch[1].trim());
+          }
+        } else if (line.match(/(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+(January|February|March|April|May|June|July|August|September|October|November|December|\w{3})\s+\d{1,2},?\s+\d{4}/i)) {
+          // Standalone date line like "Tuesday, July 29, 2025"
+          currentCustomer.installationDate = parseAndFormatDate(line.trim());
+        } else if (line.match(/(January|February|March|April|May|June|July|August|September|October|November|December|\w{3})\s+\d{1,2},?\s+\d{4}/i)) {
+          // Date without day of week like "July 25, 2025"
+          currentCustomer.installationDate = parseAndFormatDate(line.trim());
         }
       }
 
-      // Extract installation time
-      if (line.match(/\d{1,2}:\d{2}/) || line.match(/\d{1,2}\s*(am|pm)/i)) {
-        const timeMatch = line.match(/(\d{1,2}[:\s]*\d{0,2}[-\s]*(am|pm|\d{1,2}[:\s]*\d{2}))/i);
-        if (timeMatch && !currentCustomer.installationTime) {
-          currentCustomer.installationTime = timeMatch[1].trim();
+      // Extract installation time - enhanced time range patterns
+      if (!currentCustomer.installationTime) {
+        const timeRangeMatch = line.match(/(\d{1,2}[-\s]*\d{1,2}\s*(?:p\.?m\.?|a\.?m\.?)|^\d{1,2}am\s*[-]\s*\d{1,2}pm|^\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))/i);
+        if (timeRangeMatch) {
+          currentCustomer.installationTime = timeRangeMatch[1].trim();
+        } else if (line.match(/(\d{1,2}:\d{2})/)) {
+          // Handle standard time format
+          const timeMatch = line.match(/(\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?)?)/i);
+          if (timeMatch) {
+            currentCustomer.installationTime = timeMatch[1].trim();
+          }
         }
       }
 
-      // Extract lead size
-      if (line.includes('✅') && (line.includes('500mb') || line.includes('1gig') || line.includes('2gig') || line.includes('2gb'))) {
-        if (line.toLowerCase().includes('500mb')) {
-          currentCustomer.leadSize = '500MB';
-        } else if (line.toLowerCase().includes('1gig') || line.toLowerCase().includes('1 gig')) {
-          currentCustomer.leadSize = '1GIG';
-        } else if (line.toLowerCase().includes('2gig') || line.toLowerCase().includes('2gb') || line.toLowerCase().includes('2 gig')) {
-          currentCustomer.leadSize = '2GIG';
+      // Extract lead size - enhanced pattern matching for all variations
+      if (!currentCustomer.leadSize) {
+        const leadSizeMatch = line.toLowerCase().match(/(500\s*mb(?:sp?)?|1\s*gig?|2\s*gig?|2\s*gb)/i);
+        if (leadSizeMatch) {
+          const size = leadSizeMatch[1].replace(/\s/g, '').toLowerCase();
+          if (size.includes('500mb')) {
+            currentCustomer.leadSize = '500MB';
+          } else if (size.includes('1gig') || size.includes('1g')) {
+            currentCustomer.leadSize = '1GIG';
+          } else if (size.includes('2gig') || size.includes('2gb') || size.includes('2g')) {
+            currentCustomer.leadSize = '2GIG';
+          }
         }
       }
 
       // Stop collecting if we hit another customer or section
-      if (line.match(/^[✓◦•]\s+/) && line !== (currentCustomer.name ? `✓    ${currentCustomer.name}` : '')) {
+      if (line.match(/^[✓◦•]\s+/)) {
         collectingCustomerData = false;
+        i--; // Go back one line to process the new customer
       }
     }
   }
