@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseUniversalData, CustomerInfo as UniversalCustomerInfo } from '../../../lib/universalDataParser';
 
 interface CustomerInfo {
   name: string;
@@ -509,17 +510,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing batch text' }, { status: 400 });
     }
 
-    // Parse the batch text into customer objects
-    const customers = parseBatchText(batchText);
+    // Parse the batch text using the universal parser
+    console.log('🚀 Using Universal Data Parser for preview');
+    const parseResult = parseUniversalData(batchText);
+
+    console.log('📊 Parse Preview Result:', {
+      formatDetected: parseResult.formatDetected,
+      confidence: parseResult.confidence,
+      customersFound: parseResult.customers.length,
+      warnings: parseResult.warnings.length,
+      errors: parseResult.errors.length
+    });
+
+    // Convert universal parser result to expected format
+    const customers: CustomerInfo[] = parseResult.customers.map(customer => ({
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      serviceAddress: customer.serviceAddress,
+      installationDate: customer.installationDate,
+      installationTime: customer.installationTime,
+      isReferral: customer.isReferral,
+      referralSource: customer.referralSource,
+      leadSize: customer.leadSize
+    }));
 
     if (customers.length === 0) {
-      return NextResponse.json({ error: 'No valid customer data found in the provided text. Please check your data format.' }, { status: 400 });
+      // Provide detailed feedback from universal parser
+      let errorMessage = 'No valid customer data found in the provided text.';
+      if (parseResult.errors.length > 0) {
+        errorMessage += ' Errors: ' + parseResult.errors.join('; ');
+      }
+      if (parseResult.warnings.length > 0) {
+        errorMessage += ' Warnings: ' + parseResult.warnings.join('; ');
+      }
+      errorMessage += ` Format detected: ${parseResult.formatDetected} (${parseResult.confidence}% confidence).`;
+
+      return NextResponse.json({
+        error: errorMessage,
+        parseDetails: {
+          formatDetected: parseResult.formatDetected,
+          confidence: parseResult.confidence,
+          warnings: parseResult.warnings,
+          errors: parseResult.errors,
+          metadata: parseResult.metadata
+        }
+      }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
       customers,
-      count: customers.length
+      count: customers.length,
+      parseDetails: {
+        formatDetected: parseResult.formatDetected,
+        confidence: parseResult.confidence,
+        warnings: parseResult.warnings,
+        errors: parseResult.errors,
+        metadata: parseResult.metadata
+      }
     });
 
   } catch (error: any) {
