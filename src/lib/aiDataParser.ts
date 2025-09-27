@@ -133,6 +133,8 @@ class AIDataParser {
       console.log('🎯 Using single-pass extraction for maximum initial accuracy');
       const enhancedCustomers = { customers, tokensUsed: 0 };
 
+      const allLines = cleanData.split('\n').filter(line => line.trim());
+
       const result: ParseResult = {
         customers: enhancedCustomers.customers,
         formatDetected: formatDetection.format,
@@ -140,11 +142,11 @@ class AIDataParser {
         warnings,
         errors,
         metadata: {
-          totalLines: lines.length,
-          emptyLines: data.split('\n').length - lines.length,
-          headerLines: this.countHeaderLines(lines),
-          dataLines: lines.length - this.countHeaderLines(lines),
-          averageFieldsPerLine: this.calculateAverageFields(lines),
+          totalLines: allLines.length,
+          emptyLines: data.split('\n').length - allLines.length,
+          headerLines: this.countHeaderLines(allLines),
+          dataLines: allLines.length - this.countHeaderLines(allLines),
+          averageFieldsPerLine: this.calculateAverageFields(allLines),
           aiProcessingTime: Date.now() - startTime,
           tokensUsed,
           costEstimate: tokensUsed * this.COST_PER_TOKEN
