@@ -635,9 +635,21 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Preview batch processing error:', error);
+
+    // Handle rate limit errors specifically
+    if (error.message?.includes('Rate limit exceeded')) {
+      return NextResponse.json({
+        error: 'Rate limit exceeded',
+        message: error.message,
+        type: 'rate_limit',
+        suggestion: 'Please wait before trying again or upgrade your API plan for higher limits.'
+      }, { status: 429 });
+    }
+
     return NextResponse.json({
-      error: 'Internal server error',
-      details: error.message
+      error: 'AI parsing failed. System configured for AI-only operation.',
+      details: error.message,
+      type: 'ai_parsing_error'
     }, { status: 500 });
   }
 }

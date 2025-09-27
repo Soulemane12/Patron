@@ -160,10 +160,22 @@ class AIDataParser {
 
       return result;
 
-    } catch (error) {
+    } catch (error: any) {
+      // Check for rate limit errors
+      if (error.status === 429 || error.message?.includes('rate_limit_exceeded')) {
+        console.log('⏰ Rate limit reached - need to wait before retrying');
+        errors.push('Rate limit exceeded. Please try again later or upgrade your API plan.');
+
+        // Extract retry time from error message
+        const retryMatch = error.message?.match(/Please try again in ([\dhms.]+)/);
+        const retryTime = retryMatch ? retryMatch[1] : '1 hour';
+
+        throw new Error(`Rate limit exceeded. Please try again in ${retryTime}. Current usage: 99,718/100,000 tokens.`);
+      }
+
       errors.push(`AI parsing failed: ${error}`);
 
-      // NO FALLBACK - Retry with AI only
+      // NO FALLBACK - Pure AI only
       console.log('🔄 AI parsing failed, retrying with different approach...');
       throw error;
     }
