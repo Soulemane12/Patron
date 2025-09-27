@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 import { parseUniversalData, CustomerInfo as UniversalCustomerInfo } from '../../../lib/universalDataParser';
+import { parseUniversalDataWithAI, AI_PARSER_PRESETS } from '../../../lib/aiDataParser';
+import { createSecurityModule, SECURITY_PRESETS } from '../../../lib/aiParserSecurity';
 
 interface CustomerInfo {
   name: string;
@@ -515,13 +517,15 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const isAdminRequest = authHeader === 'Bearer soulemane';
 
-    const { batchText, userId } = await request.json();
+    const { batchText, userId, useAI = true, aiConfig = 'MAXIMUM_ACCURACY' } = await request.json();
 
     console.log('Batch import request:', {
       hasText: !!batchText,
       textLength: batchText?.length,
       hasUserId: !!userId,
-      userId: userId
+      userId: userId,
+      useAI: useAI,
+      aiConfig: aiConfig
     });
 
     if (!batchText || !userId) {
@@ -529,11 +533,76 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing batch text or user ID' }, { status: 400 });
     }
 
-    // Parse the batch text using the universal parser
-    console.log('🚀 Using Universal Data Parser for batch processing');
-    const parseResult = parseUniversalData(batchText);
+    let parseResult;
 
-    console.log('📊 Parse Result:', {
+    // Always use AI for maximum accuracy (only fallback if AI completely fails)
+    if (process.env.GROQ_API_KEY) {
+      console.log('🤖 Using AI-Only Data Parser for maximum accuracy batch processing');
+
+      try {
+        // Initialize security module
+        const security = createSecurityModule(SECURITY_PRESETS.STANDARD);
+
+        // Security validation
+        const securityCheck = await security.validateSecurityRequirements(batchText, {
+          userAgent: request.headers.get('user-agent') || undefined,
+          ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] ||
+                     request.headers.get('x-real-ip') || undefined
+        });
+
+        if (!securityCheck.isValid) {
+          console.log('❌ Security validation failed:', securityCheck.errors);
+          return NextResponse.json({
+            error: 'Security validation failed',
+            details: securityCheck.errors,
+            warnings: securityCheck.warnings
+          }, { status: 400 });
+        }
+
+        // Log security warnings
+        if (securityCheck.warnings.length > 0) {
+          console.log('⚠️ Security warnings:', securityCheck.warnings);
+        }
+
+        // Use AI parser with maximum accuracy settings - no cost considerations
+        const aiParserConfig = AI_PARSER_PRESETS.MAXIMUM_ACCURACY; // Absolute maximum accuracy
+        parseResult = await parseUniversalDataWithAI(securityCheck.sanitizedData, aiParserConfig);
+
+        console.log('🤖 AI Parse Result:', {
+          formatDetected: parseResult.formatDetected,
+          confidence: parseResult.confidence,
+          customersFound: parseResult.customers.length,
+          warnings: parseResult.warnings.length,
+          errors: parseResult.errors.length,
+          aiProcessingTime: parseResult.metadata.aiProcessingTime,
+          tokensUsed: parseResult.metadata.tokensUsed,
+          costEstimate: `$${parseResult.metadata.costEstimate.toFixed(4)}`
+        });
+
+        // Add security info to warnings
+        if (securityCheck.piiAnalysis.hasPII) {
+          parseResult.warnings.push(`PII detected (${securityCheck.piiAnalysis.riskLevel} risk): ${securityCheck.piiAnalysis.piiTypes.join(', ')}`);
+        }
+
+      } catch (aiError) {
+        console.error('❌ CRITICAL: AI parsing failed completely. This should be investigated:', aiError);
+        return NextResponse.json({
+          error: 'AI parsing failed. System configured for AI-only operation.',
+          details: `AI Error: ${aiError}`,
+          suggestion: 'Please check GROQ_API_KEY configuration and try again.'
+        }, { status: 500 });
+      }
+    } else {
+      // No AI key configured - return error since we want AI-only
+      console.error('❌ GROQ_API_KEY not configured but system set to AI-only mode');
+      return NextResponse.json({
+        error: 'AI parsing not available. System configured for AI-only operation.',
+        details: 'GROQ_API_KEY environment variable not configured.',
+        suggestion: 'Please configure GROQ_API_KEY to use AI parsing.'
+      }, { status: 500 });
+    }
+
+    console.log('📊 Final Parse Result:', {
       formatDetected: parseResult.formatDetected,
       confidence: parseResult.confidence,
       customersFound: parseResult.customers.length,
