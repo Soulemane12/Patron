@@ -61,10 +61,13 @@ export default function StatsPage({ customers, onSwitchToCalendar }: StatsPagePr
     setThisMonthInstallations(thisMonth.length);
     
     // Status statistics
+    console.log('StatsPage - Customer statuses:', customers.map(c => ({ name: c.name, status: c.status })));
+
     const active = customers.filter(c => c.status === 'active' || c.status === undefined);
     setActiveCustomers(active.length);
 
     const inProgress = customers.filter(c => c.status === 'in_progress');
+    console.log('StatsPage - in_progress customers:', inProgress.map(c => ({ name: c.name, status: c.status })));
     setInProgressCustomers(inProgress.length);
 
     const cancelled = customers.filter(c => c.status === 'cancelled');
