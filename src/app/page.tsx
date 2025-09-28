@@ -1103,7 +1103,8 @@ export default function Home() {
           customer.status !== 'completed' &&
           customer.status !== 'not_paid' &&
           customer.status !== 'paid' &&
-          customer.status !== 'cancelled') {
+          customer.status !== 'cancelled' &&
+          customer.status !== 'in_progress') {
 
         try {
           // Update customer status to 'not_paid' in database
