@@ -538,7 +538,22 @@ function parseBatchText(batchText: string): CustomerInfo[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const { batchText, useAI = true, aiConfig = 'MAXIMUM_ACCURACY' } = await request.json();
+    let requestData;
+
+    // Handle JSON parsing errors gracefully
+    try {
+      requestData = await request.json();
+    } catch (jsonError) {
+      console.error('JSON parsing error:', jsonError);
+      return NextResponse.json({
+        error: 'Invalid JSON format in request',
+        details: 'Please ensure your data is properly formatted. Tab characters and special characters may need to be escaped.',
+        type: 'json_parsing_error',
+        suggestion: 'Try sending the data with properly escaped special characters or use a different format.'
+      }, { status: 400 });
+    }
+
+    const { batchText, useAI = true, aiConfig = 'MAXIMUM_ACCURACY' } = requestData;
 
     if (!batchText) {
       return NextResponse.json({ error: 'Missing batch text' }, { status: 400 });
