@@ -538,11 +538,21 @@ function parseBatchText(batchText: string): CustomerInfo[] {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('📨📨📨 PREVIEW BATCH ENDPOINT CALLED 📨📨📨');
+    console.log('Request method:', request.method);
+    console.log('Request URL:', request.url);
+    console.log('Content-Type:', request.headers.get('content-type'));
+    console.log('User-Agent:', request.headers.get('user-agent'));
+
     let requestData;
 
     // Handle JSON parsing errors gracefully
     try {
+      console.log('🔍 Attempting to parse JSON request...');
       requestData = await request.json();
+      console.log('✅ JSON parsing successful');
+      console.log('Request data keys:', Object.keys(requestData));
+      console.log('BatchText length:', requestData.batchText?.length || 0);
     } catch (jsonError) {
       console.error('JSON parsing error:', jsonError);
 
@@ -582,6 +592,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing batch text' }, { status: 400 });
     }
 
+    // Sanitize input data by removing null bytes and other control characters that might cause AI issues
+    const sanitizedBatchText = batchText
+      .replace(/\x00/g, '') // Remove null bytes
+      .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove other control characters except \n, \r, \t
+      .trim();
+
+    if (sanitizedBatchText !== batchText) {
+      console.log('⚠️ Input data contained control characters that were removed');
+      console.log('Original length:', batchText.length, 'Sanitized length:', sanitizedBatchText.length);
+    }
+
     let parseResult;
 
     // Always use AI for maximum accuracy
@@ -593,7 +614,7 @@ export async function POST(request: NextRequest) {
         const security = createSecurityModule('PERMISSIVE');
 
         // Security validation
-        const securityCheck = await security.validateSecurityRequirements(batchText, {
+        const securityCheck = await security.validateSecurityRequirements(sanitizedBatchText, {
           userAgent: request.headers.get('user-agent') || undefined,
           ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] ||
                      request.headers.get('x-real-ip') || undefined
@@ -628,12 +649,41 @@ export async function POST(request: NextRequest) {
           parseResult.warnings.push(`PII detected (${securityCheck.piiAnalysis.riskLevel} risk): ${securityCheck.piiAnalysis.piiTypes.join(', ')}`);
         }
 
-      } catch (aiError) {
-        console.error('❌ CRITICAL: AI parsing failed completely. This should be investigated:', aiError);
+      } catch (aiError: any) {
+        console.error('❌❌❌ AI PARSING FAILED COMPLETELY ❌❌❌');
+        console.error('AI Error object:', aiError);
+        console.error('AI Error name:', aiError.name);
+        console.error('AI Error message:', aiError.message);
+        console.error('AI Error stack:', aiError.stack);
+        console.error('AI Error type:', typeof aiError);
+        console.error('❌❌❌ END AI ERROR ❌❌❌');
+
+        // Check if this is the specific non-JSON response error
+        if (aiError.message?.includes('AI returned non-JSON response')) {
+          return NextResponse.json({
+            error: 'Data parsing failed due to corrupted input',
+            details: 'The data you copied appears to contain special characters or formatting that cannot be processed. This commonly happens when copying from certain spreadsheet applications.',
+            suggestion: 'Try copying smaller sections of data, or save your spreadsheet as a CSV file and copy from there.',
+            type: 'data_corruption_error',
+            debugInfo: {
+              errorType: 'non_json_ai_response',
+              sanitizationApplied: sanitizedBatchText !== batchText,
+              originalLength: batchText?.length || 0,
+              sanitizedLength: sanitizedBatchText?.length || 0
+            }
+          }, { status: 400 });
+        }
+
         return NextResponse.json({
           error: 'AI parsing failed. System configured for AI-only operation.',
           details: `AI Error: ${aiError}`,
-          suggestion: 'Please check GROQ_API_KEY configuration and try again.'
+          suggestion: 'Please check GROQ_API_KEY configuration and try again.',
+          aiErrorDetails: {
+            name: aiError.name,
+            message: aiError.message,
+            stack: aiError.stack?.split('\n').slice(0, 10),
+            type: typeof aiError
+          }
         }, { status: 500 });
       }
     } else {
@@ -704,7 +754,35 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Preview batch processing error:', error);
+    console.error('❌❌❌ DETAILED ERROR INFORMATION ❌❌❌');
+    console.error('Error object:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Error type:', typeof error);
+    console.error('Error constructor:', error.constructor?.name);
+
+    if (error.cause) {
+      console.error('Error cause:', error.cause);
+    }
+
+    // Log environment info
+    console.error('Environment info:');
+    console.error('- GROQ_API_KEY exists:', !!process.env.GROQ_API_KEY);
+    console.error('- Node version:', process.version);
+    console.error('- Platform:', process.platform);
+
+    // Log request info if available
+    try {
+      console.error('Request info:');
+      console.error('- Headers:', Object.fromEntries(request.headers.entries()));
+      console.error('- Method:', request.method);
+      console.error('- URL:', request.url);
+    } catch (reqError) {
+      console.error('Could not log request info:', reqError);
+    }
+
+    console.error('❌❌❌ END DETAILED ERROR ❌❌❌');
 
     // Handle rate limit errors specifically
     if (error.message?.includes('Rate limit exceeded')) {
@@ -712,14 +790,28 @@ export async function POST(request: NextRequest) {
         error: 'Rate limit exceeded',
         message: error.message,
         type: 'rate_limit',
-        suggestion: 'Please wait before trying again or upgrade your API plan for higher limits.'
+        suggestion: 'Please wait before trying again or upgrade your API plan for higher limits.',
+        debugInfo: {
+          errorName: error.name,
+          errorStack: error.stack?.split('\n').slice(0, 5),
+          timestamp: new Date().toISOString()
+        }
       }, { status: 429 });
     }
 
     return NextResponse.json({
       error: 'AI parsing failed. System configured for AI-only operation.',
       details: error.message,
-      type: 'ai_parsing_error'
+      type: 'ai_parsing_error',
+      debugInfo: {
+        errorName: error.name,
+        errorMessage: error.message,
+        errorStack: error.stack?.split('\n').slice(0, 10),
+        errorType: typeof error,
+        hasGroqKey: !!process.env.GROQ_API_KEY,
+        timestamp: new Date().toISOString(),
+        nodeVersion: process.version
+      }
     }, { status: 500 });
   }
 }

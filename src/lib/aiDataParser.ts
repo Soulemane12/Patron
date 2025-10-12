@@ -790,7 +790,22 @@ Respond with ONLY this JSON format:
         }
       }
 
-      const parsed = JSON.parse(cleanResponse);
+      console.log('🔍 Attempting to parse AI response as JSON...');
+      console.log('Clean response length:', cleanResponse.length);
+      console.log('Clean response preview:', cleanResponse.substring(0, 100));
+
+      let parsed;
+      try {
+        parsed = JSON.parse(cleanResponse);
+      } catch (jsonError) {
+        console.error('❌ JSON parsing failed, AI returned non-JSON response');
+        console.error('Raw response:', response.substring(0, 500));
+
+        // If JSON parsing fails, it means the AI returned a completely non-JSON response
+        // This usually happens when there are control characters or null bytes in the input
+        // Return an empty array and let the outer error handling deal with it
+        throw new Error(`AI returned non-JSON response. This usually happens with corrupted input data containing control characters. Response preview: ${response.substring(0, 200)}`);
+      }
       return (parsed.customers || []).map((customer: any) => {
         // Validate that we have real customer data, not placeholders
         const hasValidName = customer.name &&
