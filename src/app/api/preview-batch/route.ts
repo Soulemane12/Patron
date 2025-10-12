@@ -545,12 +545,35 @@ export async function POST(request: NextRequest) {
       requestData = await request.json();
     } catch (jsonError) {
       console.error('JSON parsing error:', jsonError);
-      return NextResponse.json({
-        error: 'Invalid JSON format in request',
-        details: 'Please ensure your data is properly formatted. Tab characters and special characters may need to be escaped.',
-        type: 'json_parsing_error',
-        suggestion: 'Try sending the data with properly escaped special characters or use a different format.'
-      }, { status: 400 });
+
+      // Try to read the raw text and clean it
+      try {
+        const rawText = await request.text();
+        console.log('Raw request text (first 200 chars):', rawText.substring(0, 200));
+
+        // Try to extract batchText from malformed JSON
+        const batchTextMatch = rawText.match(/"batchText"\s*:\s*"([\s\S]*?)"/m);
+        if (batchTextMatch) {
+          const extractedText = batchTextMatch[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\t/g, '\t')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+
+          console.log('Extracted text from malformed JSON, length:', extractedText.length);
+          requestData = { batchText: extractedText };
+        } else {
+          throw new Error('Could not extract batch text from request');
+        }
+      } catch (extractError) {
+        console.error('Failed to extract data from malformed request:', extractError);
+        return NextResponse.json({
+          error: 'Invalid JSON format in request',
+          details: 'Please ensure your data is properly formatted. Control characters and special characters may cause issues when copying from spreadsheets.',
+          type: 'json_parsing_error',
+          suggestion: 'Try copying smaller chunks of data or removing any special formatting from your spreadsheet.'
+        }, { status: 400 });
+      }
     }
 
     const { batchText, useAI = true, aiConfig = 'MAXIMUM_ACCURACY' } = requestData;
