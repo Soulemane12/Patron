@@ -267,7 +267,12 @@ function parseBatchText(batchText: string): CustomerInfo[] {
   const firstLineColumns = firstLine ? firstLine.split('\t').length : 0;
   const hasStructuredPattern = firstLineColumns >= 20; // Your data has ~26 columns
 
-  const isStructuredData = hasHeaders || hasStructuredPattern;
+  // Check for order management format specifically
+  const isOrderFormat = firstLineColumns >= 25 && firstLine &&
+    (firstLine.includes('Order Date') || firstLine.includes('Rep ID') ||
+     (hasStructuredPattern && batchText.includes('Regular Order') && batchText.includes('Fiber')))
+
+  const isStructuredData = hasHeaders || hasStructuredPattern || isOrderFormat;
 
   if (isStructuredData && lines.length > 1) {
     // Handle structured spreadsheet data
@@ -293,6 +298,11 @@ function parseBatchText(batchText: string): CustomerInfo[] {
       repNameIndex = repIdIndex + 1; // Rep name comes after Rep ID
     }
 
+    // Handle order management format with specific column mappings
+    if (isOrderFormat && firstLineColumns >= 25) {
+      console.log('Detected order management format with', firstLineColumns, 'columns');
+    }
+
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -304,7 +314,21 @@ function parseBatchText(batchText: string): CustomerInfo[] {
         // Extract data from specific columns
         let repName, streetAddress, unit, city, state, zipCode, installDate, fiberPlan;
 
-        if (hasStructuredPattern && !hasHeaders) {
+        if (isOrderFormat && firstLineColumns >= 25) {
+          // Handle order management format with specific column positions
+          repName = parts[6] || ''; // Rep Name
+          streetAddress = parts[11] || ''; // Street Address
+          unit = parts[12] || ''; // Unit
+          city = parts[13] || ''; // City
+          state = parts[14] || ''; // State
+          zipCode = parts[15] || ''; // Zip
+          installDate = parts[17] || ''; // Installation Date
+          fiberPlan = parts[8] || ''; // Fiber Plan
+
+          // Extract status for order format (column 16)
+          const orderStatus = parts[16] || '';
+          console.log(`Processing order: ${repName}, Status: ${orderStatus}, Plan: ${fiberPlan}`);
+        } else if (hasStructuredPattern && !hasHeaders) {
           // Use fixed positions for data without headers
           repName = parts[6] || '';
           streetAddress = parts[11] || '';
@@ -337,11 +361,13 @@ function parseBatchText(batchText: string): CustomerInfo[] {
 
         // Determine lead size from fiber plan
         let leadSize: '500MB' | '1GIG' | '2GIG' = '2GIG';
-        if (fiberPlan.toLowerCase().includes('500')) {
+        const fiberPlanLower = fiberPlan.toLowerCase();
+        if (fiberPlanLower.includes('500')) {
           leadSize = '500MB';
-        } else if (fiberPlan.toLowerCase().includes('1 gig') || fiberPlan.toLowerCase().includes('1gig')) {
+        } else if (fiberPlanLower.includes('1 gig') || fiberPlanLower.includes('1gig')) {
           leadSize = '1GIG';
-        } else if (fiberPlan.toLowerCase().includes('2 gig') || fiberPlan.toLowerCase().includes('2gig')) {
+        } else if (fiberPlanLower.includes('2 gig') || fiberPlanLower.includes('2gig') ||
+                   fiberPlanLower.includes('founders club 2 gig') || fiberPlanLower.includes('fiber founders club 2 gig')) {
           leadSize = '2GIG';
         }
 
@@ -358,10 +384,16 @@ function parseBatchText(batchText: string): CustomerInfo[] {
 
         // Only add if we have essential data
         if (streetAddress && repName) {
+          // Generate more realistic email from name and address
+          const emailName = repName.toLowerCase()
+            .replace(/[^a-z\s]/g, '') // Remove non-letters except spaces
+            .replace(/\s+/g, '.') // Replace spaces with dots
+            .substring(0, 20); // Limit length
+
           customers.push({
             name: repName || `Customer ${i}`,
-            email: `${repName.toLowerCase().replace(/\s+/g, '.')}${i}@example.com`,
-            phone: '555-000-0000', // Placeholder since not in spreadsheet
+            email: `${emailName}@customer.com`,
+            phone: '555-000-0000', // Placeholder since not in order data
             serviceAddress: serviceAddress || 'Address not provided',
             installationDate: formattedDate,
             installationTime: '10:00 AM', // Default time
@@ -514,7 +546,7 @@ export async function POST(request: NextRequest) {
 
     let parseResult;
 
-    // Always use AI for maximum accuracy (only fallback if AI completely fails)
+    // Always use AI for maximum accuracy
     if (process.env.GROQ_API_KEY) {
       console.log('🤖 Using AI-Only Data Parser for maximum accuracy preview');
 
