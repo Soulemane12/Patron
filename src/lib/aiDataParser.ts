@@ -592,6 +592,7 @@ Identify the format from these categories:
 - SALES_REPORT: Sales reports with checkmarks, bullets, labeled fields
 - SPREADSHEET_CSV: Comma-separated values with headers
 - SPREADSHEET_TSV: Tab-separated values with headers
+- ORDER_MANAGEMENT_TSV: Tab-separated order/transaction data with many columns
 - PIPE_DELIMITED: Pipe-separated data
 - STRUCTURED_TEXT: Text with labeled fields (Name:, Email:, etc.)
 - MIXED_FORMAT: Mixed delimiters and formats
@@ -615,6 +616,13 @@ Respond with ONLY this JSON format:
    */
   private buildDataExtractionPrompt(lines: string[], format: string, includeContext: boolean): string {
     const dataText = lines.join('\n');
+
+    // Detect if this looks like order management data
+    const isOrderData = this.detectOrderManagementData(dataText);
+
+    if (isOrderData) {
+      return this.buildOrderDataExtractionPrompt(dataText);
+    }
 
     return `YOU ARE A PRECISION DATA EXTRACTION EXPERT. Extract customer information with 100% accuracy.
 
@@ -1047,6 +1055,127 @@ Respond with ONLY this JSON format:
         costEstimate: tokensUsed * this.COST_PER_TOKEN
       }
     };
+  }
+
+  /**
+   * Detect if data looks like order management format
+   */
+  private detectOrderManagementData(data: string): boolean {
+    const lowerData = data.toLowerCase();
+
+    // Check for order management indicators
+    const orderIndicators = [
+      'regular order', 'order date', 'installation date', 'fiber founders',
+      'fiber 500', 'fiber 2 gig', 'pending installation', 'churned',
+      'cancelled order', 'add-', 'lumncalam', 'lumnchigh'
+    ];
+
+    const hasOrderIndicators = orderIndicators.some(indicator =>
+      lowerData.includes(indicator)
+    );
+
+    // Check for tab-separated structure with typical order data columns
+    const lines = data.split('\n').filter(line => line.trim());
+    if (lines.length > 0) {
+      const firstLine = lines[0];
+      const tabCount = (firstLine.match(/\t/g) || []).length;
+
+      // Order data typically has many tab-separated columns (15+)
+      if (tabCount >= 15 && hasOrderIndicators) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Build specialized prompt for order management data extraction
+   */
+  private buildOrderDataExtractionPrompt(dataText: string): string {
+    return `YOU ARE AN ORDER MANAGEMENT DATA EXTRACTION EXPERT. Extract customer information from order management system data.
+
+DATA TO PROCESS:
+${dataText}
+
+UNDERSTANDING ORDER DATA FORMAT:
+This is order management data with tab-separated columns including:
+- Order dates, Installation dates, Service plans
+- Customer addresses (service locations)
+- Order statuses (Active, Pending Installation, Churned, etc.)
+- Service plans (Fiber Founders Club 2 Gig, Fiber 500, etc.)
+- Order numbers (ADD-XXXXXX format)
+
+EXTRACTION RULES FOR ORDER DATA:
+
+1. CUSTOMER IDENTIFICATION:
+   - Each row represents one customer order
+   - Use the service address as the primary customer identifier
+   - Generate customer names from addresses (e.g., "311 Collington Dr" → "Collington Dr Customer")
+
+2. SERVICE ADDRESSES:
+   - Extract the full address from the address columns
+   - Combine street address, city, state, zip
+   - Examples: "311 COLLINGTON DR, MEBANE, NC 27302"
+
+3. INSTALLATION DATES:
+   - Look for installation date columns
+   - Convert to YYYY-MM-DD format
+   - Use order date if installation date is missing
+
+4. SERVICE PLANS (Lead Sizes):
+   - "Fiber Founders Club 2 Gig" → "2GIG"
+   - "Fiber 500" → "500MB"
+   - "Fiber 2 Gig" → "2GIG"
+   - Default to "2GIG" if unclear
+
+5. ORDER NUMBERS:
+   - Extract ADD-XXXXXX format order numbers
+   - Use these as reference identifiers
+
+6. STATUS MAPPING:
+   - "Active" → customer is active
+   - "Pending Installation" → scheduled for installation
+   - "Churned" → cancelled customer
+   - "Cancelled Order" → cancelled before installation
+
+7. CONTACT INFORMATION:
+   - Generate placeholder emails from address: "311.collington.dr@customer.local"
+   - Generate placeholder phones: "(919) 555-0000" format
+   - Use consistent formatting
+
+8. INSTALLATION TIMES:
+   - Default to "10:00 AM" if not specified
+   - Look for any time information in the data
+
+CUSTOMER EXTRACTION METHODOLOGY:
+- Process each row as a separate customer
+- Extract address components from multiple columns
+- Map service plans to standard lead sizes
+- Generate consistent customer identifiers
+- Create valid customer records for import
+
+CRITICAL: Convert ORDER DATA into CUSTOMER DATA format for import.
+
+RETURN ONLY THIS JSON FORMAT:
+{
+  "customers": [
+    {
+      "name": "311 Collington Dr Customer",
+      "email": "311.collington.dr@customer.local",
+      "phone": "(919) 555-0001",
+      "serviceAddress": "311 COLLINGTON DR, MEBANE, NC 27302",
+      "installationDate": "2025-07-08",
+      "installationTime": "10:00 AM",
+      "leadSize": "2GIG",
+      "isReferral": false,
+      "referralSource": "",
+      "orderNumber": "ADD-399151",
+      "notes": "Active",
+      "confidence": 95
+    }
+  ]
+}`;
   }
 }
 
