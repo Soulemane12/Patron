@@ -545,11 +545,59 @@ function parseBatchText(batchText: string): CustomerInfo[] {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('📨📨📨 BATCH CUSTOMERS ENDPOINT CALLED 📨📨📨');
+    console.log('Request method:', request.method);
+    console.log('Request URL:', request.url);
+    console.log('Content-Type:', request.headers.get('content-type'));
+    console.log('User-Agent:', request.headers.get('user-agent'));
+
     // Check for admin authentication when used from admin panel
     const authHeader = request.headers.get('authorization');
     const isAdminRequest = authHeader === 'Bearer soulemane';
 
-    const { batchText, userId, useAI = true, aiConfig = 'MAXIMUM_ACCURACY' } = await request.json();
+    let requestData;
+
+    // Handle JSON parsing errors gracefully
+    try {
+      console.log('🔍 Attempting to parse JSON request...');
+      requestData = await request.json();
+      console.log('✅ JSON parsing successful');
+      console.log('Request data keys:', Object.keys(requestData));
+      console.log('BatchText length:', requestData.batchText?.length || 0);
+    } catch (jsonError) {
+      console.error('JSON parsing error:', jsonError);
+
+      // Try to read the raw text and clean it
+      try {
+        const rawText = await request.text();
+        console.log('Raw request text (first 200 chars):', rawText.substring(0, 200));
+
+        // Try to extract batchText from malformed JSON
+        const batchTextMatch = rawText.match(/"batchText"\s*:\s*"([\s\S]*?)"/m);
+        if (batchTextMatch) {
+          const extractedText = batchTextMatch[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\t/g, '\t')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+
+          console.log('Extracted text from malformed JSON, length:', extractedText.length);
+          requestData = { batchText: extractedText };
+        } else {
+          throw new Error('Could not extract batch text from request');
+        }
+      } catch (extractError) {
+        console.error('Failed to extract data from malformed request:', extractError);
+        return NextResponse.json({
+          error: 'Invalid JSON format in request',
+          details: 'Please ensure your data is properly formatted. Control characters and special characters may cause issues when copying from spreadsheets.',
+          type: 'json_parsing_error',
+          suggestion: 'Try copying smaller chunks of data or removing any special formatting from your spreadsheet.'
+        }, { status: 400 });
+      }
+    }
+
+    const { batchText, userId, useAI = true, aiConfig = 'MAXIMUM_ACCURACY' } = requestData;
 
     console.log('Batch import request:', {
       hasText: !!batchText,
@@ -565,6 +613,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing batch text or user ID' }, { status: 400 });
     }
 
+    // Sanitize input data by removing null bytes and other control characters that might cause AI issues
+    const sanitizedBatchText = batchText
+      .replace(/\x00/g, '') // Remove null bytes
+      .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove other control characters except \n, \r, \t
+      .trim();
+
+    if (sanitizedBatchText !== batchText) {
+      console.log('⚠️ Input data contained control characters that were removed');
+      console.log('Original length:', batchText.length, 'Sanitized length:', sanitizedBatchText.length);
+    }
+
     let parseResult;
 
     // Always use AI for maximum accuracy
@@ -576,7 +635,7 @@ export async function POST(request: NextRequest) {
         const security = createSecurityModule('PERMISSIVE');
 
         // Security validation
-        const securityCheck = await security.validateSecurityRequirements(batchText, {
+        const securityCheck = await security.validateSecurityRequirements(sanitizedBatchText, {
           userAgent: request.headers.get('user-agent') || undefined,
           ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] ||
                      request.headers.get('x-real-ip') || undefined
@@ -616,12 +675,41 @@ export async function POST(request: NextRequest) {
           parseResult.warnings.push(`PII detected (${securityCheck.piiAnalysis.riskLevel} risk): ${securityCheck.piiAnalysis.piiTypes.join(', ')}`);
         }
 
-      } catch (aiError) {
-        console.error('❌ CRITICAL: AI parsing failed completely. This should be investigated:', aiError);
+      } catch (aiError: any) {
+        console.error('❌❌❌ AI PARSING FAILED COMPLETELY ❌❌❌');
+        console.error('AI Error object:', aiError);
+        console.error('AI Error name:', aiError.name);
+        console.error('AI Error message:', aiError.message);
+        console.error('AI Error stack:', aiError.stack);
+        console.error('AI Error type:', typeof aiError);
+        console.error('❌❌❌ END AI ERROR ❌❌❌');
+
+        // Check if this is the specific non-JSON response error
+        if (aiError.message?.includes('AI returned non-JSON response')) {
+          return NextResponse.json({
+            error: 'Data parsing failed due to corrupted input',
+            details: 'The data you copied appears to contain special characters or formatting that cannot be processed. This commonly happens when copying from certain spreadsheet applications.',
+            suggestion: 'Try copying smaller sections of data, or save your spreadsheet as a CSV file and copy from there.',
+            type: 'data_corruption_error',
+            debugInfo: {
+              errorType: 'non_json_ai_response',
+              sanitizationApplied: sanitizedBatchText !== batchText,
+              originalLength: batchText?.length || 0,
+              sanitizedLength: sanitizedBatchText?.length || 0
+            }
+          }, { status: 400 });
+        }
+
         return NextResponse.json({
           error: 'AI parsing failed. System configured for AI-only operation.',
           details: `AI Error: ${aiError}`,
-          suggestion: 'Please check GROQ_API_KEY configuration and try again.'
+          suggestion: 'Please check GROQ_API_KEY configuration and try again.',
+          aiErrorDetails: {
+            name: aiError.name,
+            message: aiError.message,
+            stack: aiError.stack?.split('\n').slice(0, 10),
+            type: typeof aiError
+          }
         }, { status: 500 });
       }
     } else {
