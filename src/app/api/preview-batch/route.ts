@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseUniversalData, CustomerInfo as UniversalCustomerInfo } from '../../../lib/universalDataParser';
 import { parseUniversalDataWithAI, AI_PARSER_PRESETS } from '../../../lib/aiDataParser';
 import { createSecurityModule, SECURITY_PRESETS } from '../../../lib/aiParserSecurity';
+import { BatchSplitter } from '../../../lib/batchSplitter';
 
 interface CustomerInfo {
   name: string;
@@ -536,6 +537,54 @@ function parseBatchText(batchText: string): CustomerInfo[] {
   return customers;
 }
 
+async function processPreviewChunk(chunkData: string, request: NextRequest) {
+  // Always use AI for maximum accuracy
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY not configured but system set to AI-only mode');
+  }
+
+  // Initialize security module with PERMISSIVE preset to allow email extraction
+  const security = createSecurityModule('PERMISSIVE');
+
+  // Security validation
+  const securityCheck = await security.validateSecurityRequirements(chunkData, {
+    userAgent: request.headers.get('user-agent') || undefined,
+    ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] ||
+               request.headers.get('x-real-ip') || undefined
+  });
+
+  if (!securityCheck.isValid) {
+    throw new Error(`Security validation failed: ${securityCheck.errors.join('; ')}`);
+  }
+
+  // Log security warnings
+  if (securityCheck.warnings.length > 0) {
+    console.log('⚠️ Security warnings:', securityCheck.warnings);
+  }
+
+  // Use AI parser with maximum accuracy settings - no cost considerations
+  const aiParserConfig = AI_PARSER_PRESETS.MAXIMUM_ACCURACY;
+  const parseResult = await parseUniversalDataWithAI(securityCheck.sanitizedData, aiParserConfig);
+
+  console.log('🤖 AI Preview Result:', {
+    formatDetected: parseResult.formatDetected,
+    confidence: parseResult.confidence,
+    customersFound: parseResult.customers.length,
+    warnings: parseResult.warnings.length,
+    errors: parseResult.errors.length,
+    aiProcessingTime: parseResult.metadata.aiProcessingTime,
+    tokensUsed: parseResult.metadata.tokensUsed,
+    costEstimate: `$${parseResult.metadata.costEstimate.toFixed(4)}`
+  });
+
+  // Add security info to warnings
+  if (securityCheck.piiAnalysis.hasPII) {
+    parseResult.warnings.push(`PII detected (${securityCheck.piiAnalysis.riskLevel} risk): ${securityCheck.piiAnalysis.piiTypes.join(', ')}`);
+  }
+
+  return parseResult;
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('📨📨📨 PREVIEW BATCH ENDPOINT CALLED 📨📨📨');
@@ -603,140 +652,102 @@ export async function POST(request: NextRequest) {
       console.log('Original length:', batchText.length, 'Sanitized length:', sanitizedBatchText.length);
     }
 
-    let parseResult;
+    // Check if data needs to be split for processing
+    const chunkInfo = BatchSplitter.getChunkInfo(sanitizedBatchText);
+    console.log('📊 Preview batch size analysis:', chunkInfo);
 
-    // Always use AI for maximum accuracy
-    if (process.env.GROQ_API_KEY) {
-      console.log('🤖 Using AI-Only Data Parser for maximum accuracy preview');
+    let allCustomers: any[] = [];
+    let previewParseResult: any = null;
+
+    if (chunkInfo.shouldSplit) {
+      console.log(`🔍 Preview: Large dataset detected, will show sample from first chunk`);
+      console.log(`🔀 Would split into ${chunkInfo.estimatedChunks} chunks: ${chunkInfo.reason}`);
+
+      const splitResult = BatchSplitter.split(sanitizedBatchText, {
+        maxChunkSize: 50000,
+        maxRowsPerChunk: 100,
+        preserveHeaders: true
+      });
+
+      // For preview, only process the first chunk to show sample data
+      const firstChunk = splitResult.chunks[0];
+      console.log(`📄 Processing first chunk for preview (${firstChunk.rowCount} rows)`);
 
       try {
-        // Initialize security module with PERMISSIVE preset to allow email extraction
-        const security = createSecurityModule('PERMISSIVE');
+        previewParseResult = await processPreviewChunk(firstChunk.data, request);
 
-        // Security validation
-        const securityCheck = await security.validateSecurityRequirements(sanitizedBatchText, {
-          userAgent: request.headers.get('user-agent') || undefined,
-          ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] ||
-                     request.headers.get('x-real-ip') || undefined
-        });
+        allCustomers = previewParseResult.customers.map((customer: any) => ({
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          serviceAddress: customer.serviceAddress,
+          installationDate: customer.installationDate,
+          installationTime: customer.installationTime,
+          isReferral: customer.isReferral,
+          referralSource: customer.referralSource,
+          leadSize: customer.leadSize
+        }));
 
-        if (!securityCheck.isValid) {
-          console.log('❌ Security validation failed:', securityCheck.errors);
-          return NextResponse.json({
-            error: 'Security validation failed',
-            details: securityCheck.errors,
-            warnings: securityCheck.warnings
-          }, { status: 400 });
-        }
+        // Add split info to warnings
+        previewParseResult.warnings.unshift(`Large dataset detected: Will be split into ${splitResult.chunks.length} chunks for processing. Preview shows first ${firstChunk.rowCount} rows.`);
 
-        // Use AI parser with maximum accuracy settings - no cost considerations
-        const aiParserConfig = AI_PARSER_PRESETS.MAXIMUM_ACCURACY; // Absolute maximum accuracy
-        parseResult = await parseUniversalDataWithAI(securityCheck.sanitizedData, aiParserConfig);
-
-        console.log('🤖 AI Preview Result:', {
-          formatDetected: parseResult.formatDetected,
-          confidence: parseResult.confidence,
-          customersFound: parseResult.customers.length,
-          warnings: parseResult.warnings.length,
-          errors: parseResult.errors.length,
-          aiProcessingTime: parseResult.metadata.aiProcessingTime,
-          tokensUsed: parseResult.metadata.tokensUsed,
-          costEstimate: `$${parseResult.metadata.costEstimate.toFixed(4)}`
-        });
-
-        // Add security info to warnings
-        if (securityCheck.piiAnalysis.hasPII) {
-          parseResult.warnings.push(`PII detected (${securityCheck.piiAnalysis.riskLevel} risk): ${securityCheck.piiAnalysis.piiTypes.join(', ')}`);
-        }
-
-      } catch (aiError: any) {
-        console.error('❌❌❌ AI PARSING FAILED COMPLETELY ❌❌❌');
-        console.error('AI Error object:', aiError);
-        console.error('AI Error name:', aiError.name);
-        console.error('AI Error message:', aiError.message);
-        console.error('AI Error stack:', aiError.stack);
-        console.error('AI Error type:', typeof aiError);
-        console.error('❌❌❌ END AI ERROR ❌❌❌');
-
-        // Check if this is the specific non-JSON response error
-        if (aiError.message?.includes('AI returned non-JSON response')) {
-          return NextResponse.json({
-            error: 'Data parsing failed due to corrupted input',
-            details: 'The data you copied appears to contain special characters or formatting that cannot be processed. This commonly happens when copying from certain spreadsheet applications.',
-            suggestion: 'Try copying smaller sections of data, or save your spreadsheet as a CSV file and copy from there.',
-            type: 'data_corruption_error',
-            debugInfo: {
-              errorType: 'non_json_ai_response',
-              sanitizationApplied: sanitizedBatchText !== batchText,
-              originalLength: batchText?.length || 0,
-              sanitizedLength: sanitizedBatchText?.length || 0
-            }
-          }, { status: 400 });
-        }
-
-        return NextResponse.json({
-          error: 'AI parsing failed. System configured for AI-only operation.',
-          details: `AI Error: ${aiError}`,
-          suggestion: 'Please check GROQ_API_KEY configuration and try again.',
-          aiErrorDetails: {
-            name: aiError.name,
-            message: aiError.message,
-            stack: aiError.stack?.split('\n').slice(0, 10),
-            type: typeof aiError
-          }
-        }, { status: 500 });
+      } catch (chunkError) {
+        console.error('Error processing preview chunk:', chunkError);
+        throw chunkError;
       }
     } else {
-      // No AI key configured - return error since we want AI-only
-      console.error('❌ GROQ_API_KEY not configured but system set to AI-only mode');
-      return NextResponse.json({
-        error: 'AI parsing not available. System configured for AI-only operation.',
-        details: 'GROQ_API_KEY environment variable not configured.',
-        suggestion: 'Please configure GROQ_API_KEY to use AI parsing.'
-      }, { status: 500 });
+      console.log('📄 Processing single preview batch (no splitting needed)');
+      previewParseResult = await processPreviewChunk(sanitizedBatchText, request);
+
+      allCustomers = previewParseResult.customers.map((customer: any) => ({
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        serviceAddress: customer.serviceAddress,
+        installationDate: customer.installationDate,
+        installationTime: customer.installationTime,
+        isReferral: customer.isReferral,
+        referralSource: customer.referralSource,
+        leadSize: customer.leadSize
+      }));
     }
 
-    console.log('📊 Parse Preview Result:', {
-      formatDetected: parseResult.formatDetected,
-      confidence: parseResult.confidence,
-      customersFound: parseResult.customers.length,
-      warnings: parseResult.warnings.length,
-      errors: parseResult.errors.length
-    });
+    const customers = allCustomers;
+    const parseResult = previewParseResult;
 
-    // Convert universal parser result to expected format
-    const customers: CustomerInfo[] = parseResult.customers.map(customer => ({
-      name: customer.name,
-      email: customer.email,
-      phone: customer.phone,
-      serviceAddress: customer.serviceAddress,
-      installationDate: customer.installationDate,
-      installationTime: customer.installationTime,
-      isReferral: customer.isReferral,
-      referralSource: customer.referralSource,
-      leadSize: customer.leadSize
-    }));
+    console.log('📊 Parse Preview Result:', {
+      formatDetected: parseResult?.formatDetected,
+      confidence: parseResult?.confidence,
+      customersFound: customers.length,
+      warnings: parseResult?.warnings?.length || 0,
+      errors: parseResult?.errors?.length || 0,
+      wasSplit: chunkInfo.shouldSplit,
+      estimatedTotalChunks: chunkInfo.shouldSplit ? chunkInfo.estimatedChunks : 1
+    });
 
     if (customers.length === 0) {
       // Provide detailed feedback from universal parser
       let errorMessage = 'No valid customer data found in the provided text.';
-      if (parseResult.errors.length > 0) {
+      if (parseResult?.errors?.length > 0) {
         errorMessage += ' Errors: ' + parseResult.errors.join('; ');
       }
-      if (parseResult.warnings.length > 0) {
+      if (parseResult?.warnings?.length > 0) {
         errorMessage += ' Warnings: ' + parseResult.warnings.join('; ');
       }
-      errorMessage += ` Format detected: ${parseResult.formatDetected} (${parseResult.confidence}% confidence).`;
+      if (parseResult?.formatDetected) {
+        errorMessage += ` Format detected: ${parseResult.formatDetected} (${parseResult.confidence}% confidence).`;
+      }
 
       return NextResponse.json({
         error: errorMessage,
-        parseDetails: {
+        parseDetails: parseResult ? {
           formatDetected: parseResult.formatDetected,
           confidence: parseResult.confidence,
           warnings: parseResult.warnings,
           errors: parseResult.errors,
-          metadata: parseResult.metadata
-        }
+          metadata: parseResult.metadata,
+          splitInfo: chunkInfo
+        } : { splitInfo: chunkInfo }
       }, { status: 400 });
     }
 
@@ -744,13 +755,15 @@ export async function POST(request: NextRequest) {
       success: true,
       customers,
       count: customers.length,
-      parseDetails: {
+      parseDetails: parseResult ? {
         formatDetected: parseResult.formatDetected,
         confidence: parseResult.confidence,
         warnings: parseResult.warnings,
         errors: parseResult.errors,
-        metadata: parseResult.metadata
-      }
+        metadata: parseResult.metadata,
+        splitInfo: chunkInfo,
+        isPreviewOfLargeDataset: chunkInfo.shouldSplit
+      } : { splitInfo: chunkInfo }
     });
 
   } catch (error: any) {
