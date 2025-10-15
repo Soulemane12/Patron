@@ -14,6 +14,7 @@ interface User {
   is_approved?: boolean;
   approved_at?: string;
   approved_by?: string;
+  visible_on_leaderboard?: boolean;
 }
 
 interface Customer {
@@ -106,7 +107,7 @@ export default function PeoplePage() {
 
     // Sort by total customers (visible ones only), then by active customers
     return userStats
-      .filter(item => item.user.is_approved && !item.user.is_paused)
+      .filter(item => item.user.is_approved && !item.user.is_paused && item.user.visible_on_leaderboard !== false)
       .sort((a, b) => {
         if (b.stats.total !== a.stats.total) {
           return b.stats.total - a.stats.total;
@@ -140,8 +141,8 @@ export default function PeoplePage() {
               {/* User count only */}
               <div className="mb-6">
                 <div className="bg-blue-50 p-4 rounded-lg inline-block">
-                  <p className="text-sm text-gray-600">Total Users</p>
-                  <p className="text-2xl font-bold text-blue-700">{users.length}</p>
+                  <p className="text-sm text-gray-600">Visible Users</p>
+                  <p className="text-2xl font-bold text-blue-700">{users.filter(u => u.visible_on_leaderboard !== false).length}</p>
                 </div>
               </div>
 
@@ -344,7 +345,7 @@ export default function PeoplePage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {users.map((user) => {
+                        {users.filter(user => user.visible_on_leaderboard !== false).map((user) => {
                           const stats = getCustomerStats(user.id);
                           return (
                             <tr key={user.id} className={`hover:bg-gray-50 ${user.is_paused ? 'bg-red-50' : !user.is_approved ? 'bg-yellow-50' : ''}`}>

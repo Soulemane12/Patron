@@ -14,6 +14,7 @@ interface AdminUser {
   is_approved?: boolean;
   approved_at?: string;
   approved_by?: string;
+  visible_on_leaderboard?: boolean;
 }
 
 interface AdminCustomer {
@@ -123,6 +124,13 @@ export default function AdminPage() {
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [justAddedLead, setJustAddedLead] = useState(false);
+
+  // User selection and bulk actions state
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [showUserBulkActions, setShowUserBulkActions] = useState(false);
+  const [userBulkActionType, setUserBulkActionType] = useState<'visibility' | ''>('');
+  const [userBulkVisibility, setUserBulkVisibility] = useState<boolean>(true);
+  const [processingUserBulkAction, setProcessingUserBulkAction] = useState(false);
   // Removed processedCustomerData state to simplify
 
   const handleLogin = (e: React.FormEvent) => {
@@ -755,6 +763,64 @@ export default function AdminPage() {
       alert('Failed to complete bulk action');
     } finally {
       setProcessingAllBulkAction(false);
+    }
+  };
+
+  // User selection functions
+  const handleSelectUser = (userId: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllUsers = () => {
+    if (selectedUsers.length === users.length && users.length > 0) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(users.map(user => user.id));
+    }
+  };
+
+  const handleUserBulkAction = async () => {
+    if (selectedUsers.length === 0) return;
+
+    const confirmMessage = `Are you sure you want to update leaderboard visibility for ${selectedUsers.length} user(s)?`;
+
+    if (!confirm(confirmMessage)) return;
+
+    setProcessingUserBulkAction(true);
+    try {
+      // Update visibility for selected users
+      for (const userId of selectedUsers) {
+        const user = users.find(u => u.id === userId);
+        if (user) {
+          await fetch(`/api/admin/users/${userId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer soulemane'
+            },
+            body: JSON.stringify({
+              ...user,
+              visible_on_leaderboard: userBulkVisibility
+            })
+          });
+        }
+      }
+      alert(`Successfully updated leaderboard visibility for ${selectedUsers.length} user(s)`);
+
+      // Reset state and reload data
+      setSelectedUsers([]);
+      setShowUserBulkActions(false);
+      setUserBulkActionType('');
+      loadAllData();
+    } catch (error) {
+      console.error('User bulk action error:', error);
+      alert('Failed to complete bulk action');
+    } finally {
+      setProcessingUserBulkAction(false);
     }
   };
 
@@ -1535,17 +1601,90 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
               {/* Users List */}
               {!showAllCustomers && (
               <div>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">All Users</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-gray-800">All Users</h2>
+                  {selectedUsers.length > 0 && (
+                    <button
+                      onClick={() => setShowUserBulkActions(!showUserBulkActions)}
+                      className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
+                    >
+                      Bulk Actions ({selectedUsers.length})
+                    </button>
+                  )}
+                </div>
+
+                {/* User Bulk Actions Panel */}
+                {showUserBulkActions && selectedUsers.length > 0 && (
+                  <div className="bg-orange-50 p-4 rounded-lg mb-4 border border-orange-200">
+                    <h3 className="font-semibold text-gray-800 mb-3">Bulk Actions for {selectedUsers.length} user(s)</h3>
+                    <div className="flex flex-wrap gap-4 items-end">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Action</label>
+                        <select
+                          value={userBulkActionType}
+                          onChange={(e) => setUserBulkActionType(e.target.value as any)}
+                          className="p-2 border border-gray-300 rounded bg-white text-black"
+                        >
+                          <option value="">Select action...</option>
+                          <option value="visibility">Update Leaderboard Visibility</option>
+                        </select>
+                      </div>
+
+                      {userBulkActionType === 'visibility' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Leaderboard Visibility</label>
+                          <select
+                            value={userBulkVisibility.toString()}
+                            onChange={(e) => setUserBulkVisibility(e.target.value === 'true')}
+                            className="p-2 border border-gray-300 rounded bg-white text-black"
+                          >
+                            <option value="true">Show on Leaderboard</option>
+                            <option value="false">Hide from Leaderboard</option>
+                          </select>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={handleUserBulkAction}
+                        disabled={processingUserBulkAction || !userBulkActionType}
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                      >
+                        {processingUserBulkAction ? 'Processing...' : 'Apply'}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowUserBulkActions(false);
+                          setUserBulkActionType('');
+                          setSelectedUsers([]);
+                        }}
+                        className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto">
                   <table className="min-w-full bg-white border border-gray-200 rounded-lg">
                                          <thead className="bg-gray-50">
                        <tr>
+                         <th className="px-4 py-3 text-left">
+                           <input
+                             type="checkbox"
+                             checked={selectedUsers.length === users.length && users.length > 0}
+                             onChange={handleSelectAllUsers}
+                             className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                           />
+                         </th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Approval</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Sign In</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customers</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leaderboard</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                        </tr>
                      </thead>
@@ -1554,6 +1693,14 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                         const stats = getCustomerStats(user.id);
                                                  return (
                            <tr key={user.id} className={`hover:bg-gray-50 ${user.is_paused ? 'bg-red-50' : !user.is_approved ? 'bg-yellow-50' : ''}`}>
+                             <td className="px-4 py-3">
+                               <input
+                                 type="checkbox"
+                                 checked={selectedUsers.includes(user.id)}
+                                 onChange={() => handleSelectUser(user.id)}
+                                 className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                               />
+                             </td>
                              <td className="px-4 py-3 text-sm text-gray-900">{user.email}</td>
                              <td className="px-4 py-3 text-sm">
                                <span className={`px-2 py-1 text-xs rounded-full ${
@@ -1596,6 +1743,15 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                                    Active: {stats.active} | Completed: {stats.completed} | Not Paid: {stats.notPaid} | Paid: {stats.paid} | Cancelled: {stats.cancelled}
                                  </div>
                                </div>
+                             </td>
+                             <td className="px-4 py-3 text-sm text-gray-900">
+                               <span className={`px-2 py-1 text-xs rounded-full ${
+                                 user.visible_on_leaderboard !== false
+                                   ? 'bg-green-100 text-green-800'
+                                   : 'bg-gray-100 text-gray-800'
+                               }`}>
+                                 {user.visible_on_leaderboard !== false ? 'Visible' : 'Hidden'}
+                               </span>
                              </td>
                              <td className="px-4 py-3 text-sm">
                                <div className="flex gap-2 flex-wrap">
