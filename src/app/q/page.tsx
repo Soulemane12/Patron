@@ -29,6 +29,7 @@ interface Customer {
   is_referral?: boolean;
   referral_source?: string;
   lead_size?: '500MB' | '1GIG' | '2GIG';
+  visible_on_leaderboard?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +42,7 @@ export default function PeoplePage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userCustomers, setUserCustomers] = useState<Customer[]>([]);
   const [showAllCustomers, setShowAllCustomers] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
   const loadAllData = async () => {
@@ -70,12 +72,12 @@ export default function PeoplePage() {
 
   const viewUserCustomers = (user: User) => {
     setSelectedUser(user);
-    const userCustomersList = customers.filter(c => c.user_id === user.id);
+    const userCustomersList = customers.filter(c => c.user_id === user.id && c.visible_on_leaderboard !== false);
     setUserCustomers(userCustomersList);
   };
 
   const getCustomerStats = (userId: string) => {
-    const userCustomersList = customers.filter(c => c.user_id === userId);
+    const userCustomersList = customers.filter(c => c.user_id === userId && c.visible_on_leaderboard !== false);
     const total = userCustomersList.length;
     const active = userCustomersList.filter(c => c.status === 'active' || c.status === undefined).length;
     const completed = userCustomersList.filter(c => c.status === 'completed' || c.status === 'not_paid' || c.status === 'paid').length;
@@ -88,11 +90,30 @@ export default function PeoplePage() {
 
   const getFilteredCustomers = () => {
     return customers.filter(customer =>
-      customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+      customer.visible_on_leaderboard !== false &&
+      (customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
       customer.email.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
       customer.service_address.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-      users.find(u => u.id === customer.user_id)?.email.toLowerCase().includes(customerSearchTerm.toLowerCase())
+      users.find(u => u.id === customer.user_id)?.email.toLowerCase().includes(customerSearchTerm.toLowerCase()))
     );
+  };
+
+  const getLeaderboard = () => {
+    const userStats = users.map(user => ({
+      user,
+      stats: getCustomerStats(user.id)
+    }));
+
+    // Sort by total customers (visible ones only), then by active customers
+    return userStats
+      .filter(item => item.user.is_approved && !item.user.is_paused)
+      .sort((a, b) => {
+        if (b.stats.total !== a.stats.total) {
+          return b.stats.total - a.stats.total;
+        }
+        return b.stats.active - a.stats.active;
+      })
+      .slice(0, 10); // Top 10
   };
 
   useEffect(() => {
@@ -128,7 +149,19 @@ export default function PeoplePage() {
               <div className="flex gap-4 mb-6">
                 <button
                   onClick={() => {
+                    setShowLeaderboard(!showLeaderboard);
+                    setShowAllCustomers(false);
+                    setSelectedUser(null);
+                    setUserCustomers([]);
+                  }}
+                  className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
+                >
+                  {showLeaderboard ? 'Hide Leaderboard' : 'Show Leaderboard'}
+                </button>
+                <button
+                  onClick={() => {
                     setShowAllCustomers(!showAllCustomers);
+                    setShowLeaderboard(false);
                     setSelectedUser(null);
                     setUserCustomers([]);
                   }}
@@ -138,6 +171,67 @@ export default function PeoplePage() {
                 </button>
               </div>
 
+              {/* Leaderboard */}
+              {showLeaderboard && (
+                <div className="bg-white rounded-lg shadow mb-6">
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h2 className="text-xl font-semibold text-gray-800">🏆 Leaderboard</h2>
+                        <p className="text-gray-600">Top performers ranked by customer count</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="space-y-4">
+                      {getLeaderboard().map((entry, index) => (
+                        <div
+                          key={entry.user.id}
+                          className={`flex items-center justify-between p-4 rounded-lg border ${
+                            index === 0
+                              ? 'bg-yellow-50 border-yellow-200'
+                              : index === 1
+                              ? 'bg-gray-50 border-gray-200'
+                              : index === 2
+                              ? 'bg-orange-50 border-orange-200'
+                              : 'bg-white border-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                              index === 0
+                                ? 'bg-yellow-500 text-white'
+                                : index === 1
+                                ? 'bg-gray-500 text-white'
+                                : index === 2
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-blue-500 text-white'
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{entry.user.email}</div>
+                              <div className="text-sm text-gray-500">
+                                Active: {entry.stats.active} | Completed: {entry.stats.completed} | Total: {entry.stats.total}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl font-bold text-blue-600">{entry.stats.total}</span>
+                            <span className="text-sm text-gray-500">customers</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {getLeaderboard().length === 0 && (
+                      <p className="text-center py-8 text-gray-500">No active users found.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* All Customers View */}
               {showAllCustomers && (
                 <div className="bg-white rounded-lg shadow mb-6">
@@ -145,7 +239,7 @@ export default function PeoplePage() {
                     <div className="flex justify-between items-center mb-4">
                       <div>
                         <h2 className="text-xl font-semibold text-gray-800">All Customers</h2>
-                        <p className="text-gray-600">View all customers across all users ({customers.length} total)</p>
+                        <p className="text-gray-600">View all customers across all users ({customers.filter(c => c.visible_on_leaderboard !== false).length} visible)</p>
                       </div>
 
                       {/* Search */}
@@ -233,7 +327,7 @@ export default function PeoplePage() {
               )}
 
               {/* Users List */}
-              {!showAllCustomers && (
+              {!showAllCustomers && !showLeaderboard && (
                 <div>
                   <h2 className="text-xl font-semibold text-gray-800 mb-4">All Users</h2>
                   <div className="overflow-x-auto">

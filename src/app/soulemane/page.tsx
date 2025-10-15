@@ -29,6 +29,7 @@ interface AdminCustomer {
   is_referral?: boolean;
   referral_source?: string;
   lead_size?: '500MB' | '1GIG' | '2GIG';
+  visible_on_leaderboard?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -45,6 +46,7 @@ interface NewCustomerData {
   is_referral: boolean;
   referral_source?: string;
   lead_size: '500MB' | '1GIG' | '2GIG';
+  visible_on_leaderboard: boolean;
   processed_timestamp?: number;
 }
 
@@ -82,7 +84,8 @@ export default function AdminPage() {
     status: 'active',
     is_referral: false,
     referral_source: '',
-    lead_size: '2GIG'
+    lead_size: '2GIG',
+    visible_on_leaderboard: true
   });
   
   // Check authentication on component mount
@@ -102,18 +105,20 @@ export default function AdminPage() {
   // Customer selection state
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const [bulkActionType, setBulkActionType] = useState<'status' | 'delete' | 'transfer' | ''>('');
+  const [bulkActionType, setBulkActionType] = useState<'status' | 'delete' | 'transfer' | 'visibility' | ''>('');
   const [bulkStatus, setBulkStatus] = useState<'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress'>('active');
   const [bulkTransferUserId, setBulkTransferUserId] = useState('');
+  const [bulkVisibility, setBulkVisibility] = useState<boolean>(true);
   const [processingBulkAction, setProcessingBulkAction] = useState(false);
 
   // All customers view state
   const [showAllCustomers, setShowAllCustomers] = useState(false);
   const [allSelectedCustomers, setAllSelectedCustomers] = useState<string[]>([]);
   const [showAllBulkActions, setShowAllBulkActions] = useState(false);
-  const [allBulkActionType, setAllBulkActionType] = useState<'status' | 'delete' | 'transfer' | ''>('');
+  const [allBulkActionType, setAllBulkActionType] = useState<'status' | 'delete' | 'transfer' | 'visibility' | ''>('');
   const [allBulkStatus, setAllBulkStatus] = useState<'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress'>('active');
   const [allBulkTransferUserId, setAllBulkTransferUserId] = useState('');
+  const [allBulkVisibility, setAllBulkVisibility] = useState<boolean>(true);
   const [processingAllBulkAction, setProcessingAllBulkAction] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -442,7 +447,8 @@ export default function AdminPage() {
         status: 'active',
         is_referral: false,
         referral_source: '',
-        lead_size: '2GIG'
+        lead_size: '2GIG',
+        visible_on_leaderboard: true
       });
       setCustomerInputText('');
       
@@ -597,6 +603,25 @@ export default function AdminPage() {
           }
         }
         alert(`Successfully transferred ${selectedCustomers.length} customer(s)`);
+      } else if (bulkActionType === 'visibility') {
+        // Update visibility for selected customers
+        for (const customerId of selectedCustomers) {
+          const customer = userCustomers.find(c => c.id === customerId);
+          if (customer) {
+            await fetch(`/api/admin/customers/${customerId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer soulemane'
+              },
+              body: JSON.stringify({
+                ...customer,
+                visible_on_leaderboard: bulkVisibility
+              })
+            });
+          }
+        }
+        alert(`Successfully updated leaderboard visibility for ${selectedCustomers.length} customer(s)`);
       }
 
       // Reset state and reload data
@@ -699,6 +724,25 @@ export default function AdminPage() {
           }
         }
         alert(`Successfully transferred ${allSelectedCustomers.length} customer(s)`);
+      } else if (allBulkActionType === 'visibility') {
+        // Update visibility for selected customers
+        for (const customerId of allSelectedCustomers) {
+          const customer = customers.find(c => c.id === customerId);
+          if (customer) {
+            await fetch(`/api/admin/customers/${customerId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer soulemane'
+              },
+              body: JSON.stringify({
+                ...customer,
+                visible_on_leaderboard: allBulkVisibility
+              })
+            });
+          }
+        }
+        alert(`Successfully updated leaderboard visibility for ${allSelectedCustomers.length} customer(s)`);
       }
 
       // Reset state and reload data
@@ -1000,6 +1044,31 @@ export default function AdminPage() {
                         />
                       </div>
                     )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Show on Leaderboard?</label>
+                      <div className="flex items-center gap-4 mt-2">
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            name="visible_on_leaderboard"
+                            checked={newCustomerData.visible_on_leaderboard === true}
+                            onChange={() => setNewCustomerData({...newCustomerData, visible_on_leaderboard: true})}
+                            className="form-radio h-4 w-4 text-blue-600"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">Yes</span>
+                        </label>
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            name="visible_on_leaderboard"
+                            checked={newCustomerData.visible_on_leaderboard === false}
+                            onChange={() => setNewCustomerData({...newCustomerData, visible_on_leaderboard: false})}
+                            className="form-radio h-4 w-4 text-blue-600"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">No</span>
+                        </label>
+                      </div>
+                    </div>
                     <div className="md:col-span-2 lg:col-span-3">
                       <button
                         type="submit"
@@ -1275,6 +1344,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                               <option value="">Select action...</option>
                               <option value="status">Update Status</option>
                               <option value="transfer">Transfer to User</option>
+                              <option value="visibility">Update Leaderboard Visibility</option>
                               <option value="delete">Delete</option>
                             </select>
                           </div>
@@ -1309,6 +1379,20 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                                 {users.map(user => (
                                   <option key={user.id} value={user.id}>{user.email}</option>
                                 ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {allBulkActionType === 'visibility' && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Leaderboard Visibility</label>
+                              <select
+                                value={allBulkVisibility.toString()}
+                                onChange={(e) => setAllBulkVisibility(e.target.value === 'true')}
+                                className="p-2 border border-gray-300 rounded bg-white text-black"
+                              >
+                                <option value="true">Show on Leaderboard</option>
+                                <option value="false">Hide from Leaderboard</option>
                               </select>
                             </div>
                           )}
@@ -1356,6 +1440,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Installation</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead Size</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leaderboard</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
@@ -1407,6 +1492,15 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                             <td className="px-4 py-3 text-sm text-gray-900">
                               <span className="bg-purple-100 text-purple-800 px-2 py-1 text-xs rounded-full">
                                 {customer.lead_size || '2GIG'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                customer.visible_on_leaderboard !== false
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {customer.visible_on_leaderboard !== false ? 'Visible' : 'Hidden'}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-sm font-medium">
@@ -1598,6 +1692,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                             <option value="">Select action...</option>
                             <option value="status">Update Status</option>
                             <option value="transfer">Transfer to User</option>
+                            <option value="visibility">Update Leaderboard Visibility</option>
                             <option value="delete">Delete</option>
                           </select>
                         </div>
@@ -1632,6 +1727,20 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                               {users.filter(u => u.id !== selectedUser?.id).map(user => (
                                 <option key={user.id} value={user.id}>{user.email}</option>
                               ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {bulkActionType === 'visibility' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Leaderboard Visibility</label>
+                            <select
+                              value={bulkVisibility.toString()}
+                              onChange={(e) => setBulkVisibility(e.target.value === 'true')}
+                              className="p-2 border border-gray-300 rounded bg-white text-black"
+                            >
+                              <option value="true">Show on Leaderboard</option>
+                              <option value="false">Hide from Leaderboard</option>
                             </select>
                           </div>
                         )}
@@ -1677,6 +1786,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Installation</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead Size</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leaderboard</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
@@ -1722,6 +1832,15 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                                </span>
                              </td>
                             <td className="px-4 py-3 text-sm text-gray-900">{customer.lead_size || '2GIG'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                customer.visible_on_leaderboard !== false
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {customer.visible_on_leaderboard !== false ? 'Visible' : 'Hidden'}
+                              </span>
+                            </td>
                             <td className="px-4 py-3 text-sm text-gray-500">
                               {new Date(customer.created_at).toLocaleDateString()}
                             </td>
@@ -1883,6 +2002,31 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                         />
                       </div>
                     )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Show on Leaderboard?</label>
+                      <div className="flex items-center gap-4 mt-2">
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            name="edit_visible_on_leaderboard"
+                            checked={editingCustomer.visible_on_leaderboard === true}
+                            onChange={() => setEditingCustomer({...editingCustomer, visible_on_leaderboard: true})}
+                            className="form-radio h-4 w-4 text-blue-600"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">Yes</span>
+                        </label>
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            name="edit_visible_on_leaderboard"
+                            checked={editingCustomer.visible_on_leaderboard === false || editingCustomer.visible_on_leaderboard === undefined}
+                            onChange={() => setEditingCustomer({...editingCustomer, visible_on_leaderboard: false})}
+                            className="form-radio h-4 w-4 text-blue-600"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">No</span>
+                        </label>
+                      </div>
+                    </div>
                     <div className="md:col-span-2 lg:col-span-3 flex gap-4">
                       <button
                         type="submit"
