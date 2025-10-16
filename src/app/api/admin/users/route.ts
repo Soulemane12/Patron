@@ -52,7 +52,8 @@ export async function GET(request: NextRequest) {
         paused_at: status?.paused_at || null,
         is_approved: status?.is_approved || false,
         approved_at: status?.approved_at || null,
-        approved_by: status?.approved_by || null
+        approved_by: status?.approved_by || null,
+        visible_on_leaderboard: status?.visible_on_leaderboard !== false
       };
     });
 

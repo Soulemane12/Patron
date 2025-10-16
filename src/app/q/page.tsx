@@ -49,12 +49,8 @@ export default function PeoplePage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      // Load all data from admin API
-      const response = await fetch('/api/admin/users', {
-        headers: {
-          'Authorization': 'Bearer soulemane'
-        }
-      });
+      // Load data from public API (manager access - only visible users)
+      const response = await fetch('/api/public/users');
 
       if (!response.ok) {
         throw new Error('Failed to load data');
@@ -73,12 +69,12 @@ export default function PeoplePage() {
 
   const viewUserCustomers = (user: User) => {
     setSelectedUser(user);
-    const userCustomersList = customers.filter(c => c.user_id === user.id && c.visible_on_leaderboard !== false);
+    const userCustomersList = customers.filter(c => c.user_id === user.id);
     setUserCustomers(userCustomersList);
   };
 
   const getCustomerStats = (userId: string) => {
-    const userCustomersList = customers.filter(c => c.user_id === userId && c.visible_on_leaderboard !== false);
+    const userCustomersList = customers.filter(c => c.user_id === userId);
     const total = userCustomersList.length;
     const active = userCustomersList.filter(c => c.status === 'active' || c.status === undefined).length;
     const completed = userCustomersList.filter(c => c.status === 'completed' || c.status === 'not_paid' || c.status === 'paid').length;
@@ -91,11 +87,10 @@ export default function PeoplePage() {
 
   const getFilteredCustomers = () => {
     return customers.filter(customer =>
-      customer.visible_on_leaderboard !== false &&
-      (customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+      customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
       customer.email.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
       customer.service_address.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-      users.find(u => u.id === customer.user_id)?.email.toLowerCase().includes(customerSearchTerm.toLowerCase()))
+      users.find(u => u.id === customer.user_id)?.email.toLowerCase().includes(customerSearchTerm.toLowerCase())
     );
   };
 
@@ -105,9 +100,9 @@ export default function PeoplePage() {
       stats: getCustomerStats(user.id)
     }));
 
-    // Sort by total customers (visible ones only), then by active customers
+    // Sort by total customers, then by active customers
     return userStats
-      .filter(item => item.user.is_approved && !item.user.is_paused && item.user.visible_on_leaderboard !== false)
+      .filter(item => item.user.is_approved && !item.user.is_paused)
       .sort((a, b) => {
         if (b.stats.total !== a.stats.total) {
           return b.stats.total - a.stats.total;
@@ -141,8 +136,8 @@ export default function PeoplePage() {
               {/* User count only */}
               <div className="mb-6">
                 <div className="bg-blue-50 p-4 rounded-lg inline-block">
-                  <p className="text-sm text-gray-600">Visible Users</p>
-                  <p className="text-2xl font-bold text-blue-700">{users.filter(u => u.visible_on_leaderboard !== false).length}</p>
+                  <p className="text-sm text-gray-600">Available Users</p>
+                  <p className="text-2xl font-bold text-blue-700">{users.length}</p>
                 </div>
               </div>
 
@@ -240,7 +235,7 @@ export default function PeoplePage() {
                     <div className="flex justify-between items-center mb-4">
                       <div>
                         <h2 className="text-xl font-semibold text-gray-800">All Customers</h2>
-                        <p className="text-gray-600">View all customers across all users ({customers.filter(c => c.visible_on_leaderboard !== false).length} visible)</p>
+                        <p className="text-gray-600">View all customers across all users ({customers.length} available)</p>
                       </div>
 
                       {/* Search */}
@@ -345,7 +340,7 @@ export default function PeoplePage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {users.filter(user => user.visible_on_leaderboard !== false).map((user) => {
+                        {users.map((user) => {
                           const stats = getCustomerStats(user.id);
                           return (
                             <tr key={user.id} className={`hover:bg-gray-50 ${user.is_paused ? 'bg-red-50' : !user.is_approved ? 'bg-yellow-50' : ''}`}>
