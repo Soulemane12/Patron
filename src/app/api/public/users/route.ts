@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch user status' }, { status: 500 });
     }
 
-    // Filter and format only visible users
+    // Filter and format only explicitly visible users
     const visibleUsers = users.users
       .map(user => {
         const status = userStatus?.find(s => s.user_id === user.id);
@@ -38,11 +38,11 @@ export async function GET(request: NextRequest) {
           is_approved: status?.is_approved || false,
           approved_at: status?.approved_at || null,
           approved_by: status?.approved_by || null,
-          visible_on_leaderboard: status?.visible_on_leaderboard !== false,
+          visible_on_leaderboard: status?.visible_on_leaderboard === true,
           status: status
         };
       })
-      .filter(user => user.visible_on_leaderboard !== false); // Only return visible users
+      .filter(user => user.visible_on_leaderboard === true); // Only return explicitly visible users
 
     // Get visible user IDs
     const visibleUserIds = visibleUsers.map(user => user.id);
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     // Only return customers that are also marked as visible
     const visibleCustomers = customers?.filter(customer =>
-      customer.visible_on_leaderboard !== false
+      customer.visible_on_leaderboard === true
     ) || [];
 
     return NextResponse.json({

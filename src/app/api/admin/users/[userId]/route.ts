@@ -60,7 +60,7 @@ export async function PUT(
           is_approved: userData.is_approved || false,
           approved_at: userData.is_approved ? new Date().toISOString() : null,
           approved_by: userData.is_approved ? 'admin' : null,
-          visible_on_leaderboard: userData.visible_on_leaderboard !== false
+          visible_on_leaderboard: userData.visible_on_leaderboard === true
         });
 
       if (error) {

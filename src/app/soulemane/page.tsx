@@ -794,20 +794,16 @@ export default function AdminPage() {
     try {
       // Update visibility for selected users
       for (const userId of selectedUsers) {
-        const user = users.find(u => u.id === userId);
-        if (user) {
-          await fetch(`/api/admin/users/${userId}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer soulemane'
-            },
-            body: JSON.stringify({
-              ...user,
-              visible_on_leaderboard: userBulkVisibility
-            })
-          });
-        }
+        await fetch(`/api/admin/users/${userId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer soulemane'
+          },
+          body: JSON.stringify({
+            visible_on_leaderboard: userBulkVisibility
+          })
+        });
       }
       alert(`Successfully updated leaderboard visibility for ${selectedUsers.length} user(s)`);
 

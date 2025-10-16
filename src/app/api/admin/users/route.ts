@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         is_approved: status?.is_approved || false,
         approved_at: status?.approved_at || null,
         approved_by: status?.approved_by || null,
-        visible_on_leaderboard: status?.visible_on_leaderboard !== false
+        visible_on_leaderboard: status?.visible_on_leaderboard === true
       };
     });
 
