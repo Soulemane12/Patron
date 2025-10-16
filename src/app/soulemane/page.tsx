@@ -629,7 +629,7 @@ export default function AdminPage() {
             });
           }
         }
-        alert(`Successfully updated leaderboard visibility for ${selectedCustomers.length} customer(s)`);
+        alert(`Successfully updated Q's branch visibility for ${selectedCustomers.length} customer(s)`);
       }
 
       // Reset state and reload data
@@ -750,7 +750,7 @@ export default function AdminPage() {
             });
           }
         }
-        alert(`Successfully updated leaderboard visibility for ${allSelectedCustomers.length} customer(s)`);
+        alert(`Successfully updated Q's branch visibility for ${allSelectedCustomers.length} customer(s)`);
       }
 
       // Reset state and reload data
@@ -786,7 +786,7 @@ export default function AdminPage() {
   const handleUserBulkAction = async () => {
     if (selectedUsers.length === 0) return;
 
-    const confirmMessage = `Are you sure you want to update leaderboard visibility for ${selectedUsers.length} user(s)?`;
+    const confirmMessage = `Are you sure you want to update Q's branch assignment for ${selectedUsers.length} user(s)?`;
 
     if (!confirm(confirmMessage)) return;
 
@@ -805,7 +805,7 @@ export default function AdminPage() {
           })
         });
       }
-      alert(`Successfully updated leaderboard visibility for ${selectedUsers.length} user(s)`);
+      alert(`Successfully updated Q's branch assignment for ${selectedUsers.length} user(s)`);
 
       // Reset state and reload data
       setSelectedUsers([]);
@@ -1107,7 +1107,7 @@ export default function AdminPage() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Show on Leaderboard?</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Q's Branch?</label>
                       <div className="flex items-center gap-4 mt-2">
                         <label className="inline-flex items-center">
                           <input
@@ -1406,7 +1406,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                               <option value="">Select action...</option>
                               <option value="status">Update Status</option>
                               <option value="transfer">Transfer to User</option>
-                              <option value="visibility">Update Leaderboard Visibility</option>
+                              <option value="visibility">Assign to Q's Branch</option>
                               <option value="delete">Delete</option>
                             </select>
                           </div>
@@ -1447,14 +1447,14 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
 
                           {allBulkActionType === 'visibility' && (
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Leaderboard Visibility</label>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Q's Branch Assignment</label>
                               <select
                                 value={allBulkVisibility.toString()}
                                 onChange={(e) => setAllBulkVisibility(e.target.value === 'true')}
                                 className="p-2 border border-gray-300 rounded bg-white text-black"
                               >
-                                <option value="true">Show on Leaderboard</option>
-                                <option value="false">Hide from Leaderboard</option>
+                                <option value="true">Assign to Q's Branch</option>
+                                <option value="false">Remove from Q's Branch</option>
                               </select>
                             </div>
                           )}
@@ -1502,7 +1502,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Installation</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead Size</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leaderboard</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Q's Branch</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
@@ -1622,20 +1622,20 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                           className="p-2 border border-gray-300 rounded bg-white text-black"
                         >
                           <option value="">Select action...</option>
-                          <option value="visibility">Update Leaderboard Visibility</option>
+                          <option value="visibility">Assign to Q's Branch</option>
                         </select>
                       </div>
 
                       {userBulkActionType === 'visibility' && (
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Leaderboard Visibility</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Branch Assignment</label>
                           <select
                             value={userBulkVisibility.toString()}
                             onChange={(e) => setUserBulkVisibility(e.target.value === 'true')}
                             className="p-2 border border-gray-300 rounded bg-white text-black"
                           >
-                            <option value="true">Show on Leaderboard</option>
-                            <option value="false">Hide from Leaderboard</option>
+                            <option value="true">Assign to Q's Branch</option>
+                            <option value="false">Remove from Q's Branch</option>
                           </select>
                         </div>
                       )}
@@ -1680,7 +1680,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Sign In</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customers</th>
-                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leaderboard</th>
+                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Q's Branch</th>
                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                        </tr>
                      </thead>
@@ -1746,7 +1746,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                                    ? 'bg-green-100 text-green-800'
                                    : 'bg-gray-100 text-gray-800'
                                }`}>
-                                 {user.visible_on_leaderboard !== false ? 'Visible' : 'Hidden'}
+                                 {user.visible_on_leaderboard !== false ? 'In Q\'s Branch' : 'Not Assigned'}
                                </span>
                              </td>
                              <td className="px-4 py-3 text-sm">
@@ -1844,7 +1844,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                             <option value="">Select action...</option>
                             <option value="status">Update Status</option>
                             <option value="transfer">Transfer to User</option>
-                            <option value="visibility">Update Leaderboard Visibility</option>
+                            <option value="visibility">Assign to Q's Branch</option>
                             <option value="delete">Delete</option>
                           </select>
                         </div>
@@ -1885,14 +1885,14 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
 
                         {bulkActionType === 'visibility' && (
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Leaderboard Visibility</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Q's Branch Assignment</label>
                             <select
                               value={bulkVisibility.toString()}
                               onChange={(e) => setBulkVisibility(e.target.value === 'true')}
                               className="p-2 border border-gray-300 rounded bg-white text-black"
                             >
-                              <option value="true">Show on Leaderboard</option>
-                              <option value="false">Hide from Leaderboard</option>
+                              <option value="true">Assign to Q's Branch</option>
+                              <option value="false">Remove from Q's Branch</option>
                             </select>
                           </div>
                         )}
@@ -1938,7 +1938,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Installation</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead Size</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leaderboard</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Q's Branch</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
@@ -2155,7 +2155,7 @@ Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
                       </div>
                     )}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Show on Leaderboard?</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Q's Branch?</label>
                       <div className="flex items-center gap-4 mt-2">
                         <label className="inline-flex items-center">
                           <input

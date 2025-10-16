@@ -14,7 +14,7 @@ interface User {
   is_approved?: boolean;
   approved_at?: string;
   approved_by?: string;
-  visible_on_leaderboard?: boolean;
+  visible_on_branch?: boolean;
 }
 
 interface Customer {
@@ -30,7 +30,7 @@ interface Customer {
   is_referral?: boolean;
   referral_source?: string;
   lead_size?: '500MB' | '1GIG' | '2GIG';
-  visible_on_leaderboard?: boolean;
+  visible_on_branch?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -43,7 +43,7 @@ export default function PeoplePage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userCustomers, setUserCustomers] = useState<Customer[]>([]);
   const [showAllCustomers, setShowAllCustomers] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(true);
+  const [showBranchView, setShowBranchView] = useState(true);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
   const loadAllData = async () => {
@@ -94,7 +94,7 @@ export default function PeoplePage() {
     );
   };
 
-  const getLeaderboard = () => {
+  const getBranchPerformance = () => {
     const userStats = users.map(user => ({
       user,
       stats: getCustomerStats(user.id)
@@ -122,8 +122,8 @@ export default function PeoplePage() {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-blue-800">People Directory</h1>
-              <p className="text-gray-600">View all users and their customer data</p>
+              <h1 className="text-2xl font-bold text-blue-800">Q's Branch Management</h1>
+              <p className="text-gray-600">View all users and customers in Q's branch</p>
             </div>
           </div>
 
@@ -136,7 +136,7 @@ export default function PeoplePage() {
               {/* User count only */}
               <div className="mb-6">
                 <div className="bg-blue-50 p-4 rounded-lg inline-block">
-                  <p className="text-sm text-gray-600">Available Users</p>
+                  <p className="text-sm text-gray-600">Users in Q's Branch</p>
                   <p className="text-2xl font-bold text-blue-700">{users.length}</p>
                 </div>
               </div>
@@ -145,19 +145,19 @@ export default function PeoplePage() {
               <div className="flex gap-4 mb-6">
                 <button
                   onClick={() => {
-                    setShowLeaderboard(!showLeaderboard);
+                    setShowBranchView(!showBranchView);
                     setShowAllCustomers(false);
                     setSelectedUser(null);
                     setUserCustomers([]);
                   }}
                   className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
                 >
-                  {showLeaderboard ? 'Hide Leaderboard' : 'Show Leaderboard'}
+                  {showBranchView ? 'Hide Performance View' : 'Show Performance View'}
                 </button>
                 <button
                   onClick={() => {
                     setShowAllCustomers(!showAllCustomers);
-                    setShowLeaderboard(false);
+                    setShowBranchView(false);
                     setSelectedUser(null);
                     setUserCustomers([]);
                   }}
@@ -167,21 +167,21 @@ export default function PeoplePage() {
                 </button>
               </div>
 
-              {/* Leaderboard */}
-              {showLeaderboard && (
+              {/* Branch Performance View */}
+              {showBranchView && (
                 <div className="bg-white rounded-lg shadow mb-6">
                   <div className="p-6 border-b border-gray-200">
                     <div className="flex justify-between items-center mb-4">
                       <div>
-                        <h2 className="text-xl font-semibold text-gray-800">🏆 Leaderboard</h2>
-                        <p className="text-gray-600">Top performers ranked by customer count</p>
+                        <h2 className="text-xl font-semibold text-gray-800">📊 Branch Performance</h2>
+                        <p className="text-gray-600">Top performers in Q's branch ranked by customer count</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="p-6">
                     <div className="space-y-4">
-                      {getLeaderboard().map((entry, index) => (
+                      {getBranchPerformance().map((entry, index) => (
                         <div
                           key={entry.user.id}
                           className={`flex items-center justify-between p-4 rounded-lg border ${
@@ -221,8 +221,8 @@ export default function PeoplePage() {
                       ))}
                     </div>
 
-                    {getLeaderboard().length === 0 && (
-                      <p className="text-center py-8 text-gray-500">No active users found.</p>
+                    {getBranchPerformance().length === 0 && (
+                      <p className="text-center py-8 text-gray-500">No active users found in Q's branch.</p>
                     )}
                   </div>
                 </div>
@@ -323,7 +323,7 @@ export default function PeoplePage() {
               )}
 
               {/* Users List */}
-              {!showAllCustomers && !showLeaderboard && (
+              {!showAllCustomers && !showBranchView && (
                 <div>
                   <h2 className="text-xl font-semibold text-gray-800 mb-4">All Users</h2>
                   <div className="overflow-x-auto">
