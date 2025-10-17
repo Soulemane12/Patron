@@ -42,9 +42,8 @@ export default function PeoplePage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userCustomers, setUserCustomers] = useState<Customer[]>([]);
-  const [showAllCustomers, setShowAllCustomers] = useState(false);
+  const [showUserAnalytics, setShowUserAnalytics] = useState(false);
   const [showBranchView, setShowBranchView] = useState(true);
-  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
   const loadAllData = async () => {
     setLoading(true);
@@ -85,14 +84,6 @@ export default function PeoplePage() {
     return { total, active, completed, notPaid, paid, cancelled };
   };
 
-  const getFilteredCustomers = () => {
-    return customers.filter(customer =>
-      customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-      customer.service_address.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-      users.find(u => u.id === customer.user_id)?.email.toLowerCase().includes(customerSearchTerm.toLowerCase())
-    );
-  };
 
   const getBranchPerformance = () => {
     const userStats = users.map(user => ({
@@ -146,7 +137,7 @@ export default function PeoplePage() {
                 <button
                   onClick={() => {
                     setShowBranchView(!showBranchView);
-                    setShowAllCustomers(false);
+                    setShowUserAnalytics(false);
                     setSelectedUser(null);
                     setUserCustomers([]);
                   }}
@@ -156,14 +147,14 @@ export default function PeoplePage() {
                 </button>
                 <button
                   onClick={() => {
-                    setShowAllCustomers(!showAllCustomers);
+                    setShowUserAnalytics(!showUserAnalytics);
                     setShowBranchView(false);
                     setSelectedUser(null);
                     setUserCustomers([]);
                   }}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  {showAllCustomers ? 'Hide All Customers' : 'View All Customers'}
+                  {showUserAnalytics ? 'Hide User Analytics' : 'Show User Analytics'}
                 </button>
               </div>
 
@@ -228,102 +219,107 @@ export default function PeoplePage() {
                 </div>
               )}
 
-              {/* All Customers View */}
-              {showAllCustomers && (
+              {/* User Analytics View */}
+              {showUserAnalytics && (
                 <div className="bg-white rounded-lg shadow mb-6">
                   <div className="p-6 border-b border-gray-200">
                     <div className="flex justify-between items-center mb-4">
                       <div>
-                        <h2 className="text-xl font-semibold text-gray-800">All Customers</h2>
-                        <p className="text-gray-600">View all customers across all users ({customers.length} available)</p>
-                      </div>
-
-                      {/* Search */}
-                      <div className="flex gap-4 items-center">
-                        <div>
-                          <input
-                            type="text"
-                            placeholder="Search customers..."
-                            value={customerSearchTerm}
-                            onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-black focus:ring-2 focus:ring-indigo-500"
-                          />
-                        </div>
+                        <h2 className="text-xl font-semibold text-gray-800">📈 User Analytics</h2>
+                        <p className="text-gray-600">Detailed analytics for users in Q's branch</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Installation</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lead Size</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {getFilteredCustomers().map((customer) => (
-                          <tr key={customer.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm text-gray-900">{customer.name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900">{customer.email}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900">{customer.phone}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={customer.service_address}>
-                              {customer.service_address}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900">
-                              {users.find(u => u.id === customer.user_id)?.email || 'Unknown User'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900">
-                              <div>
-                                <div>{new Date(customer.installation_date).toLocaleDateString()}</div>
-                                <div className="text-xs text-gray-500">{customer.installation_time}</div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                      {users.map((user) => {
+                        const stats = getCustomerStats(user.id);
+                        return (
+                          <div key={user.id} className="bg-gray-50 p-4 rounded-lg border">
+                            <div className="mb-3">
+                              <h3 className="font-medium text-gray-900 truncate" title={user.email}>
+                                {user.email}
+                              </h3>
+                              <div className="flex gap-2 mt-1">
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  user.is_approved
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {user.is_approved ? 'APPROVED' : 'PENDING'}
+                                </span>
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  user.is_paused
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-green-100 text-green-800'
+                                }`}>
+                                  {user.is_paused ? 'PAUSED' : 'ACTIVE'}
+                                </span>
                               </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                customer.status === 'active' || customer.status === undefined
-                                  ? 'bg-green-100 text-green-800'
-                                  : customer.status === 'in_progress'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : customer.status === 'cancelled'
-                                  ? 'bg-red-100 text-red-800'
-                                  : customer.status === 'completed'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : customer.status === 'paid'
-                                  ? 'bg-green-100 text-green-800'
-                                  : customer.status === 'not_paid'
-                                  ? 'bg-orange-100 text-orange-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {customer.status === 'in_progress' ? 'Missed Installation' : customer.status || 'active'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900">
-                              <span className="bg-purple-100 text-purple-800 px-2 py-1 text-xs rounded-full">
-                                {customer.lead_size || '2GIG'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Total:</span>
+                                <span className="font-medium text-blue-600">{stats.total}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Active:</span>
+                                <span className="font-medium text-green-600">{stats.active}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Completed:</span>
+                                <span className="font-medium text-blue-600">{stats.completed}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Paid:</span>
+                                <span className="font-medium text-green-600">{stats.paid}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Not Paid:</span>
+                                <span className="font-medium text-orange-600">{stats.notPaid}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Cancelled:</span>
+                                <span className="font-medium text-red-600">{stats.cancelled}</span>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <div className="text-xs text-gray-500">
+                                <div>Joined: {new Date(user.created_at).toLocaleDateString()}</div>
+                                <div>Last Sign In: {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : 'Never'}</div>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                if (selectedUser?.id === user.id) {
+                                  setSelectedUser(null);
+                                  setUserCustomers([]);
+                                } else {
+                                  viewUserCustomers(user);
+                                }
+                              }}
+                              className={`w-full mt-3 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                                selectedUser?.id === user.id
+                                  ? 'bg-red-500 text-white hover:bg-red-600'
+                                  : 'bg-blue-500 text-white hover:bg-blue-600'
+                              }`}
+                            >
+                              {selectedUser?.id === user.id ? 'Hide Customers' : 'View Customers'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  {getFilteredCustomers().length === 0 && (
-                    <p className="text-center py-8 text-gray-500">
-                      {customerSearchTerm ? 'No customers found matching your search.' : 'No customers found.'}
-                    </p>
-                  )}
                 </div>
               )}
 
               {/* Users List */}
-              {!showAllCustomers && !showBranchView && (
+              {!showUserAnalytics && !showBranchView && (
                 <div>
                   <h2 className="text-xl font-semibold text-gray-800 mb-4">All Users</h2>
                   <div className="overflow-x-auto">
@@ -389,10 +385,21 @@ export default function PeoplePage() {
                               </td>
                               <td className="px-4 py-3 text-sm">
                                 <button
-                                  onClick={() => viewUserCustomers(user)}
-                                  className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600"
+                                  onClick={() => {
+                                    if (selectedUser?.id === user.id) {
+                                      setSelectedUser(null);
+                                      setUserCustomers([]);
+                                    } else {
+                                      viewUserCustomers(user);
+                                    }
+                                  }}
+                                  className={`px-3 py-1 rounded text-xs transition-colors ${
+                                    selectedUser?.id === user.id
+                                      ? 'bg-red-500 text-white hover:bg-red-600'
+                                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                                  }`}
                                 >
-                                  View Customers
+                                  {selectedUser?.id === user.id ? 'Hide Customers' : 'View Customers'}
                                 </button>
                               </td>
                             </tr>
