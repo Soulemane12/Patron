@@ -147,7 +147,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storageKey: 'patron-auth',
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'implicit', // Change to implicit for better mobile support
+    flowType: 'pkce', // Required for magic link / OTP sign-in
     debug: false, // Disable debug to reduce console noise
     storage: mobileStorage
   },
