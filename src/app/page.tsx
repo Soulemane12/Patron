@@ -102,13 +102,6 @@ export default function Home() {
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
   const [isManualSaving, setIsManualSaving] = useState(false); // Lock to prevent auto-save interference
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [batchMode, setBatchMode] = useState(false);
-  const [batchText, setBatchText] = useState('');
-  const [batchProcessing, setBatchProcessing] = useState(false);
-  const [batchResults, setBatchResults] = useState<{ success: number; failed: number; errors: string[] }>({ success: 0, failed: 0, errors: [] });
-  const [batchPreview, setBatchPreview] = useState<CustomerInfo[]>([]);
-  const [showBatchPreview, setShowBatchPreview] = useState(false);
-  const [isPreviewingBatch, setIsPreviewingBatch] = useState(false);
 
   // Fallback function to load from localStorage
   const loadFromLocalStorageFallback = useCallback(() => {
@@ -465,44 +458,6 @@ export default function Home() {
         if (session?.user) {
           console.log('Valid session found for user:', session.user.email);
 
-          // Check if user is approved before allowing access
-          try {
-            const approvalResponse = await fetch('/api/check-approval', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ userId: session.user.id })
-            });
-
-            if (approvalResponse.ok) {
-              const approvalData = await approvalResponse.json();
-
-              if (!approvalData.isApproved) {
-                // User is not approved, sign them out and redirect
-                console.log('User not approved, redirecting to login');
-                await supabase.auth.signOut();
-                if (mounted) {
-                  router.push('/login');
-                }
-                return;
-              }
-
-              if (approvalData.isPaused) {
-                // User is paused, sign them out and redirect with message
-                console.log('User is paused, redirecting to login');
-                await supabase.auth.signOut();
-                if (mounted) {
-                  window.location.href = '/login?message=account_paused';
-                }
-                return;
-              }
-            }
-          } catch (approvalError) {
-            console.error('Error checking approval status:', approvalError);
-            // Continue with login if approval check fails (fallback)
-          }
-
           if (mounted) {
             setUser(session.user);
             setIsAuthenticated(true);
@@ -539,42 +494,6 @@ export default function Home() {
 
         if (user) {
           console.log('User found:', user.email);
-
-          // Check if user is approved before allowing access
-          try {
-            const approvalResponse = await fetch('/api/check-approval', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ userId: user.id })
-            });
-
-            if (approvalResponse.ok) {
-              const approvalData = await approvalResponse.json();
-
-              if (!approvalData.isApproved) {
-                // User is not approved, redirect to login
-                console.log('User not approved, redirecting to login');
-                if (mounted) {
-                  router.push('/login');
-                }
-                return;
-              }
-
-              if (approvalData.isPaused) {
-                // User is paused, redirect with message
-                console.log('User is paused, redirecting to login');
-                if (mounted) {
-                  window.location.href = '/login?message=account_paused';
-                }
-                return;
-              }
-            }
-          } catch (approvalError) {
-            console.error('Error checking approval status:', approvalError);
-            // Continue with login if approval check fails (fallback)
-          }
 
           if (mounted) {
             setUser(user);
@@ -630,39 +549,6 @@ export default function Home() {
           router.push('/login');
         } else if (event === 'SIGNED_IN' && session?.user) {
           console.log('User signed in:', session.user.email);
-
-          // Check if user is approved before allowing access
-          try {
-            const approvalResponse = await fetch('/api/check-approval', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ userId: session.user.id })
-            });
-
-            if (approvalResponse.ok) {
-              const approvalData = await approvalResponse.json();
-
-              if (!approvalData.isApproved) {
-                // User is not approved, sign them out
-                console.log('User not approved, signing out');
-                await supabase.auth.signOut();
-                return;
-              }
-
-              if (approvalData.isPaused) {
-                // User is paused, sign them out and redirect
-                console.log('User is paused, signing out');
-                await supabase.auth.signOut();
-                window.location.href = '/login?message=account_paused';
-                return;
-              }
-            }
-          } catch (approvalError) {
-            console.error('Error checking approval status:', approvalError);
-            // Continue with login if approval check fails (fallback)
-          }
 
           setUser(session.user);
           setIsAuthenticated(true);
@@ -790,95 +676,6 @@ export default function Home() {
     }
   };
 
-  const previewBatchLeads = async () => {
-    if (!batchText.trim()) {
-      setError('Please enter batch customer information');
-      return;
-    }
-
-    setIsPreviewingBatch(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/preview-batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ batchText }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to preview batch customers');
-      }
-
-      const result = await response.json();
-      setBatchPreview(result.customers || []);
-      setShowBatchPreview(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred previewing batch customers');
-    } finally {
-      setIsPreviewingBatch(false);
-    }
-  };
-
-  const processBatchLeads = async () => {
-    if (!batchText.trim()) {
-      setError('Please enter batch customer information');
-      return;
-    }
-
-    // Count number of lines to estimate number of customers
-    const lines = batchText.trim().split('\n').filter(line => line.trim()).length;
-
-    // Show confirmation dialog
-    if (!confirm(`Are you sure you want to process ${lines} batch lead${lines === 1 ? '' : 's'}?\n\nThis will:\n• Process and import all leads into your pipeline\n• Cannot be undone once processed\n\nClick OK to continue or Cancel to abort.`)) {
-      return;
-    }
-
-    setBatchProcessing(true);
-    setError('');
-    setBatchResults({ success: 0, failed: 0, errors: [] });
-
-    try {
-      const response = await fetch('/api/batch-customers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          batchText: batchText,
-          userId: user?.id
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to process batch customers');
-      }
-
-      const result = await response.json();
-      setBatchResults(result);
-
-      if (result.success > 0) {
-        // Clear form and reload customers
-        setBatchText('');
-        setBatchPreview([]);
-        setShowBatchPreview(false);
-        await loadCustomers();
-        setActiveSection('pipeline');
-
-        try {
-          localStorage.setItem('patron-active-section', 'pipeline');
-        } catch (error) {
-          console.warn('Could not save section change:', error);
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred processing batch customers');
-    } finally {
-      setBatchProcessing(false);
-    }
-  };
 
   const clearForm = async () => {
     setInputText('');
@@ -2057,34 +1854,8 @@ export default function Home() {
             <div className="flex justify-between items-center mb-2 md:mb-4">
               <h2 className="text-lg md:text-xl font-semibold text-blue-800">Add New Sales Lead</h2>
 
-              {/* Toggle between Single and Batch mode */}
-              <div className="flex bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => setBatchMode(false)}
-                  className={`px-3 py-1 text-xs md:text-sm rounded-md transition-colors ${
-                    !batchMode
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  Single Lead
-                </button>
-                <button
-                  onClick={() => setBatchMode(true)}
-                  className={`px-3 py-1 text-xs md:text-sm rounded-md transition-colors ${
-                    batchMode
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  Batch Import
-                </button>
-              </div>
             </div>
 
-            {!batchMode ? (
-              /* Single Lead Mode */
-              <>
                 <p className="text-xs md:text-sm text-black mb-2">Paste your customer's information from your notes in any format - our AI will organize it automatically.</p>
                 <p className="text-xs text-green-600 mb-3 md:mb-4">💾 Your form data is automatically saved both locally and to your secure account - works even when switching tabs or browsers!</p>
                 <textarea
@@ -2114,161 +1885,6 @@ export default function Home() {
                     Clear
                   </button>
                 </div>
-              </>
-            ) : (
-              /* Batch Import Mode */
-              <>
-                <p className="text-xs md:text-sm text-black mb-2">Paste multiple leads from your spreadsheet - each row should contain customer info. Our AI will process them all automatically.</p>
-                <p className="text-xs text-blue-600 mb-2">📊 Supported formats: Copy from Excel, Google Sheets, or plain text with multiple entries</p>
-                <p className="text-xs text-orange-600 mb-3 md:mb-4">⚡ Example: Paste multiple rows like "John Smith, 555-123-4567, john@email.com..." (one per line)</p>
-
-                <textarea
-                  value={batchText}
-                  onChange={(e) => setBatchText(e.target.value)}
-                  placeholder={`Paste your spreadsheet data here... Example:
-John Smith, 555-123-4567, john@email.com, 123 Main St, June 15th, 2pm
-Jane Doe, 555-987-6543, jane@email.com, 456 Oak Ave, June 16th, 10am
-Bob Wilson, 555-555-5555, bob@email.com, 789 Pine St, June 17th, 3pm`}
-                  className="w-full h-40 p-4 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                />
-
-                <div className="flex flex-wrap gap-2 md:gap-4 mt-3 md:mt-4">
-                  <button
-                    onClick={previewBatchLeads}
-                    disabled={isPreviewingBatch || batchProcessing}
-                    className="px-4 md:px-6 py-2 bg-blue-600 text-white text-xs md:text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1 md:gap-2"
-                  >
-                    {isPreviewingBatch ? <LoadingSpinner /> : null}
-                    <span className="flex items-center gap-1 md:gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                      </svg>
-                      {isPreviewingBatch ? 'Previewing...' : 'Preview Batch'}
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={processBatchLeads}
-                    disabled={batchProcessing || isPreviewingBatch}
-                    className="px-4 md:px-6 py-2 bg-purple-600 text-white text-xs md:text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1 md:gap-2"
-                  >
-                    {batchProcessing ? <LoadingSpinner /> : null}
-                    <span className="flex items-center gap-1 md:gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                        <path fillRule="evenodd" d="M4 5a2 2 0 012-2v1a1 1 0 102 0V3a2 2 0 012 2v6.5l2.5-2.5a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4A1 1 0 116.5 9.5L9 12V5a2 2 0 01-2-2z" clipRule="evenodd" />
-                      </svg>
-                      {batchProcessing ? 'Processing Batch...' : 'Process Batch Leads'}
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setBatchText('');
-                      setBatchPreview([]);
-                      setShowBatchPreview(false);
-                    }}
-                    className="px-4 md:px-6 py-2 bg-gray-500 text-white text-xs md:text-sm rounded-lg hover:bg-gray-600"
-                  >
-                    Clear
-                  </button>
-                </div>
-
-                {/* Batch Preview */}
-                {showBatchPreview && batchPreview.length > 0 && (
-                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border-t-4 border-blue-500">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-800">Review Batch Import</h3>
-                      <button
-                        onClick={() => setShowBatchPreview(false)}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-4">Found {batchPreview.length} customer{batchPreview.length === 1 ? '' : 's'} ready to import. Review the details below before proceeding:</p>
-
-                    <div className="max-h-96 overflow-y-auto">
-                      {batchPreview.map((customer, index) => (
-                        <div key={index} className="bg-white p-4 rounded-lg shadow-sm mb-3 border-l-4 border-green-400">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
-                              <div className="text-sm text-gray-900">{customer.name}</div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                              <div className="text-sm text-gray-900">{customer.email}</div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-                              <div className="text-sm text-gray-900">{customer.phone}</div>
-                            </div>
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Service Address</label>
-                              <div className="text-sm text-gray-900">{customer.serviceAddress}</div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Lead Size</label>
-                              <div className="text-sm text-gray-900">{customer.leadSize}</div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Installation Date</label>
-                              <div className="text-sm text-gray-900">{new Date(customer.installationDate).toLocaleDateString()}</div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Installation Time</label>
-                              <div className="text-sm text-gray-900">{customer.installationTime}</div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-4 flex gap-3">
-                      <button
-                        onClick={processBatchLeads}
-                        disabled={batchProcessing}
-                        className="px-6 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {batchProcessing ? <LoadingSpinner /> : null}
-                        Import {batchPreview.length} Customer{batchPreview.length === 1 ? '' : 's'}
-                      </button>
-                      <button
-                        onClick={() => setShowBatchPreview(false)}
-                        className="px-6 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600"
-                      >
-                        Back to Edit
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Batch Results */}
-                {(batchResults.success > 0 || batchResults.failed > 0) && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <h3 className="font-semibold text-sm text-gray-800 mb-2">Batch Import Results:</h3>
-                    <div className="flex gap-4 mb-2">
-                      <span className="text-green-600 text-sm">✅ Successful: {batchResults.success}</span>
-                      <span className="text-red-600 text-sm">❌ Failed: {batchResults.failed}</span>
-                    </div>
-                    {batchResults.errors.length > 0 && (
-                      <details className="mt-2">
-                        <summary className="text-sm text-red-600 cursor-pointer">View Errors ({batchResults.errors.length})</summary>
-                        <div className="mt-2 text-xs text-red-500 max-h-32 overflow-y-auto">
-                          {batchResults.errors.map((error, index) => (
-                            <div key={index} className="mb-1">• {error}</div>
-                          ))}
-                        </div>
-                      </details>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
 
             {error && <p className="text-red-600 mt-2">{error}</p>}
           </div>

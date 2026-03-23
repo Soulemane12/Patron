@@ -8,56 +8,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [accountPaused, setAccountPaused] = useState(false);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('message') === 'account_paused') {
-      setAccountPaused(true);
-    }
-
-    // Handle magic link callback — exchange token for session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        await checkApprovalAndRedirect(session.user.id);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) window.location.href = '/';
     });
 
-    // Listen for auth state changes (magic link sign-in)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        await checkApprovalAndRedirect(session.user.id);
+        window.location.href = '/';
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  async function checkApprovalAndRedirect(userId: string) {
-    try {
-      const res = await fetch('/api/check-approval', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.isPaused) {
-          await supabase.auth.signOut();
-          window.location.href = '/login?message=account_paused';
-          return;
-        }
-        if (!data.isApproved) {
-          await supabase.auth.signOut();
-          setError('Your account is pending approval. Please contact the administrator.');
-          return;
-        }
-      }
-    } catch {
-      // fallback: allow in if check fails
-    }
-    window.location.href = '/';
-  }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,9 +30,7 @@ export default function LoginPage() {
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        shouldCreateUser: false, // only allow existing approved users
-      },
+      options: { shouldCreateUser: true },
     });
 
     if (error) {
@@ -113,13 +75,6 @@ export default function LoginPage() {
               />
             </div>
             {error && <p className="text-red-600 text-sm">{error}</p>}
-            {accountPaused && (
-              <div className="bg-red-50 border border-red-200 rounded p-3">
-                <p className="text-red-800 text-sm">
-                  Your account has been paused. Please contact support.
-                </p>
-              </div>
-            )}
             <button
               type="submit"
               disabled={loading}
