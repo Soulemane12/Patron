@@ -840,15 +840,15 @@ export class UniversalDataParser {
     const score = this.calculateParsingScore(partial);
 
     return {
-      name: partial.name || this.generateFallbackName(partial),
-      email: partial.email || this.generateFallbackEmail(partial),
-      phone: partial.phone || '555-000-0000',
-      serviceAddress: partial.serviceAddress || 'Address not provided',
-      installationDate: partial.installationDate || this.getDefaultInstallDate(),
-      installationTime: partial.installationTime || '10:00 AM',
+      name: partial.name || 'Not provided',
+      email: partial.email || 'Not provided',
+      phone: partial.phone || 'Not provided',
+      serviceAddress: partial.serviceAddress || 'Not provided',
+      installationDate: partial.installationDate || 'Not provided',
+      installationTime: partial.installationTime || 'Not provided',
       isReferral: false,
       referralSource: '',
-      leadSize: (partial.leadSize as '500MB' | '1GIG' | '2GIG') || '2GIG',
+      leadSize: (partial.leadSize as '500MB' | '1GIG' | '2GIG') || undefined,
       orderNumber: partial.orderNumber,
       notes: partial.notes,
       confidence: Math.round(score)
