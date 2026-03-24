@@ -19,6 +19,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Auto-approve new user so they can access the app immediately
+    await supabaseAdmin.from('user_status').insert({
+      user_id: data.user.id,
+      is_approved: true,
+      is_paused: false,
+    });
+
     return NextResponse.json({ user: data.user });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
