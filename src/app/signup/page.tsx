@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -10,21 +9,27 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setInfo(null);
-    const { error } = await supabase.auth.signUp({ email, password });
+
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
     setLoading(false);
-    if (error) {
-      setError(error.message);
+
+    if (!res.ok) {
+      setError(data.error);
       return;
     }
-    setInfo('Check your email to confirm your account, then log in.');
-    setTimeout(() => router.push('/login'), 1500);
+
+    router.push('/login');
   };
 
   return (
@@ -49,17 +54,17 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
               className="w-full p-2 border border-gray-300 rounded bg-white text-black focus:ring-2 focus:ring-blue-500"
             />
           </div>
           {error && <p className="text-red-600 text-sm">{error}</p>}
-          {info && <p className="text-green-700 text-sm">{info}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 font-medium"
           >
-            {loading ? 'Signing up...' : 'Create account'}
+            {loading ? 'Creating account...' : 'Create account'}
           </button>
         </form>
         <p className="text-center text-sm text-gray-600 mt-4">
