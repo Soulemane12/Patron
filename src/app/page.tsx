@@ -755,7 +755,7 @@ export default function Home() {
         status: status,
         is_referral: formattedInfo.isReferral || false,
         referral_source: formattedInfo.isReferral ? formattedInfo.referralSource : null,
-        lead_size: formattedInfo.leadSize || '2GIG', // Default to 2GIG as requested
+        lead_size: formattedInfo.leadSize || undefined,
       };
 
       console.log('Inserting customer data:', customerData);

@@ -856,18 +856,11 @@ export class UniversalDataParser {
   }
 
   private generateFallbackName(customer: Partial<CustomerInfo>): string {
-    if (customer.email) {
-      const localPart = customer.email.split('@')[0];
-      return localPart.replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    }
-    return 'Unknown Customer';
+    return 'Not provided';
   }
 
   private generateFallbackEmail(customer: Partial<CustomerInfo>): string {
-    if (customer.name) {
-      return `${customer.name.toLowerCase().replace(/\s+/g, '.')}@example.com`;
-    }
-    return 'customer@example.com';
+    return 'Not provided';
   }
 
   private cleanText(text: string): string {

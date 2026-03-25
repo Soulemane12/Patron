@@ -831,8 +831,8 @@ Respond with ONLY this JSON format:
           email: finalEmail,
           phone: this.cleanPhoneNumber(customer.phone),
           serviceAddress: this.cleanAddress(customer.serviceAddress),
-          installationDate: customer.installationDate || this.getDefaultInstallDate(),
-          installationTime: customer.installationTime || '10:00 AM',
+          installationDate: customer.installationDate || 'Not provided',
+          installationTime: customer.installationTime || 'Not provided',
           isReferral: Boolean(customer.isReferral),
           referralSource: this.cleanReferralSource(customer.referralSource),
           leadSize: this.validateLeadSize(customer.leadSize),
@@ -953,18 +953,16 @@ Respond with ONLY this JSON format:
       if (lowerSize.includes('1')) return '1GIG';
       if (lowerSize.includes('2')) return '2GIG';
     }
-    return '2GIG'; // Default
+    return undefined as any; // No default
   }
 
   private getDefaultInstallDate(): string {
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 7);
-    return futureDate.toISOString().split('T')[0];
+    return 'Not provided';
   }
 
   private cleanPhoneNumber(phone: any): string {
     if (!phone || phone === '555-000-0000' || phone === 'Use a 10-digit phone number with area code') {
-      return '555-000-0000';
+      return 'Not provided';
     }
 
     // Clean and format phone number
@@ -983,7 +981,7 @@ Respond with ONLY this JSON format:
         address === 'Address not provided' ||
         address === 'Provide a valid service address' ||
         address.toString().trim().length < 5) {
-      return 'Address not provided';
+      return 'Not provided';
     }
 
     return address.toString().trim();

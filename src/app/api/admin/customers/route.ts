@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       p_status: customerData.status || 'active',
       p_is_referral: customerData.is_referral || false,
       p_referral_source: customerData.is_referral ? customerData.referral_source : null,
-      p_lead_size: customerData.lead_size || '2GIG',
+      p_lead_size: customerData.lead_size || null,
     });
 
     if (error) {
