@@ -129,9 +129,9 @@ export default function BatchImport({ user, onCustomersAdded }: BatchImportProps
             phone: row.phone,
             service_address: row.serviceAddress,
             installation_date:
-              row.installationDate && row.installationDate !== 'Not provided'
+              row.installationDate && row.installationDate !== 'Not provided' && row.installationDate !== ''
                 ? row.installationDate
-                : null,
+                : new Date().toISOString().split('T')[0],
             installation_time:
               row.installationTime && row.installationTime !== 'Not provided'
                 ? row.installationTime
