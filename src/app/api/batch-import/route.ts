@@ -32,7 +32,26 @@ function tryParseTabular(text: string): { customers: any[]; formatDetected: stri
   const col = (...candidates: string[]) =>
     candidates.reduce((found, c) => found !== -1 ? found : headers.findIndex((h) => h.includes(c)), -1);
 
-  const nameIdx   = col('name');
+  // Name detection: prefer subscriber/customer/contact, avoid company/account/dealer columns.
+  // Also support separate First Name + Last Name columns.
+  const firstIdx = headers.findIndex((h) => h.includes('first') && h.includes('name') || h === 'first');
+  const lastIdx  = headers.findIndex((h) => h.includes('last')  && h.includes('name') || h === 'last');
+  const isNotCompany = (h: string) => !h.includes('company') && !h.includes('account') && !h.includes('dealer') && !h.includes('organization');
+  const nameIdx = firstIdx >= 0 && lastIdx >= 0
+    ? -2 // signal: use first+last combo
+    : (() => {
+        // Most specific first: subscriber, customer, contact
+        const specific = headers.findIndex((h) =>
+          (h.includes('subscriber') || h.includes('customer') || h.includes('contact')) && h.includes('name')
+        );
+        if (specific !== -1) return specific;
+        // Exact 'name' column
+        const exact = headers.findIndex((h) => h === 'name');
+        if (exact !== -1) return exact;
+        // Any name column that isn't a company/account/dealer name
+        return headers.findIndex((h) => h.includes('name') && isNotCompany(h));
+      })();
+
   const phoneIdx  = col('billing number', 'billing', 'phone');
   const streetIdx = col('street');
   const cityIdx   = col('city');
@@ -41,13 +60,15 @@ function tryParseTabular(text: string): { customers: any[]; formatDetected: stri
   const orderIdx  = col('order #', 'order#', 'order number');
   const statusIdx = col('order status', 'status');
 
-  if (nameIdx === -1) return null;
+  if (nameIdx === -1 && !(firstIdx >= 0 && lastIdx >= 0)) return null;
 
   const customers: any[] = [];
   for (let i = headerIdx + 1; i < lines.length; i++) {
     if (!lines[i].includes('\t')) continue;
     const c = lines[i].split('\t').map((v) => v.trim());
-    const name = c[nameIdx] || '';
+    const name = nameIdx === -2
+      ? `${c[firstIdx] || ''} ${c[lastIdx] || ''}`.trim()
+      : nameIdx >= 0 ? c[nameIdx] || '' : '';
     if (name.length < 2) continue;
 
     const phone  = phoneIdx  >= 0 ? c[phoneIdx]  || '' : '';
