@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export const maxDuration = 60;
 
@@ -98,6 +97,7 @@ function tryParseTabular(text: string): { customers: any[]; formatDetected: stri
 // ── AI fallback (for free-form / non-tabular text) ────────────────────────────
 
 async function parseWithAI(text: string): Promise<{ customers: any[]; formatDetected: string }> {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     temperature: 0.01,
