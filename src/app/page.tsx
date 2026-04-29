@@ -9,6 +9,7 @@ import DailyInstallations from './components/DailyInstallations';
 import Navbar from './components/Navbar';
 import StatsPage from './components/StatsPage';
 import CustomerDetailsModal from './components/CustomerDetailsModal';
+import BatchImport from './components/BatchImport';
 
 interface CustomerInfo {
   name: string;
@@ -1839,6 +1840,11 @@ export default function Home() {
 
 
 
+
+        {/* Batch Import Section */}
+        {activeSection === 'batch' && (
+          <BatchImport user={user} onCustomersAdded={loadCustomers} />
+        )}
 
         {/* Stats Section */}
         {activeSection === 'stats' && (
