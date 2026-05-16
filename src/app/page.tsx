@@ -459,8 +459,6 @@ export default function Home() {
 
         // If we have a valid session, use it
         if (session?.user) {
-          console.log('Valid session found for user:', session.user.email);
-
           if (mounted) {
             setUser(session.user);
             setIsAuthenticated(true);
@@ -954,18 +952,9 @@ export default function Home() {
       }
       
       let loadedCustomers = data || [];
-      console.log(`Loaded ${loadedCustomers.length} customers`);
 
       // Automatically update statuses for customers whose installation date has passed
       loadedCustomers = await updateExpiredCustomersStatus(loadedCustomers);
-
-      // Debug logging to check actual status values
-      console.log('Loaded customers with statuses:', loadedCustomers.map(c => ({
-        name: c.name,
-        status: c.status,
-        installation_date: c.installation_date,
-        created_at: c.created_at
-      })));
 
       // Update both states
       setCustomers(loadedCustomers);
@@ -1272,13 +1261,6 @@ export default function Home() {
       }
     });
     
-    console.log('Filtered customers result:', {
-      originalCount: customers.length,
-      filteredCount: filtered.length,
-      filter,
-      searchTerm,
-      filteredCustomers: filtered.map(c => ({ name: c.name, status: c.status }))
-    });
     setFilteredCustomers(filtered);
   }, [customers]);
 
@@ -1355,12 +1337,6 @@ export default function Home() {
   // Initial filtering when customers are loaded
   useEffect(() => {
     if (customers.length > 0) {
-      console.log('Initial filtering of customers:', {
-        totalCustomers: customers.length,
-        filterBy,
-        searchTerm,
-        customersWithStatus: customers.map(c => ({ name: c.name, status: c.status }))
-      });
       filterAndSortCustomers(searchTerm, filterBy, sortBy, sortOrder, locationFilter, gigSizeFilter);
     } else {
       // If no customers, set filtered to empty array
