@@ -624,9 +624,16 @@ export default function Home() {
     };
   }, [router, isAuthenticated, user]);
 
-  // Calculate email notification dates
-  const getEmailSchedule = (installationDate: string) => {
+  // Calculate email notification dates. Returns dashes when install date is missing
+  // (batch imports may not provide one).
+  const getEmailSchedule = (installationDate: string | null | undefined) => {
+    if (!installationDate) {
+      return { dayBefore: '—', dayOf: '—', followUp: '—' };
+    }
     const installDate = parseDateLocal(installationDate);
+    if (isNaN(installDate.getTime())) {
+      return { dayBefore: '—', dayOf: '—', followUp: '—' };
+    }
     const dayBefore = new Date(installDate);
     dayBefore.setDate(dayBefore.getDate() - 1);
     const dayOf = new Date(installDate);
@@ -1878,13 +1885,15 @@ export default function Home() {
                             >
                               {customer.service_address}
                             </p>
-                            <p 
-                              className="text-sm md:text-base text-black cursor-pointer hover:text-blue-600 transition-colors"
-                              onClick={() => openCustomerModal(customer)}
-                              title="Click to view full details"
-                            >
-                              <span className="font-medium">Installation:</span> {parseDateLocal(customer.installation_date).toLocaleDateString()} at {customer.installation_time}
-                            </p>
+                            {customer.installation_date && (
+                              <p
+                                className="text-sm md:text-base text-black cursor-pointer hover:text-blue-600 transition-colors"
+                                onClick={() => openCustomerModal(customer)}
+                                title="Click to view full details"
+                              >
+                                <span className="font-medium">Installation:</span> {parseDateLocal(customer.installation_date).toLocaleDateString()}{customer.installation_time ? ` at ${customer.installation_time}` : ''}
+                              </p>
+                            )}
                             <p 
                               className="text-sm md:text-base text-black cursor-pointer hover:text-blue-600 transition-colors"
                               onClick={() => openCustomerModal(customer)}

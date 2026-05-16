@@ -63,6 +63,22 @@ function normLeadSize(v: string | null | undefined): '500MB' | '1GIG' | '2GIG' |
   return (VALID_LEAD as readonly string[]).includes(up) ? (up as any) : null;
 }
 
+// Map free-form order-status strings (e.g. "Submitted - COMPLETED", "CANCELLED",
+// "Submitted - PROVIDER IN PROCESS") onto the app's status enum.
+type CustomerStatus = 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress';
+function normStatus(v: string | null | undefined): CustomerStatus | null {
+  const t = nullish(v);
+  if (!t) return null;
+  const low = t.toLowerCase();
+  if (low.includes('cancel')) return 'cancelled';
+  if (low.includes('not paid') || low.includes('unpaid')) return 'not_paid';
+  if (low.includes('paid')) return 'paid';
+  if (low.includes('completed') || low.includes('complete')) return 'completed';
+  if (low.includes('in process') || low.includes('in progress') || low.includes('provider in') || low.includes('pending')) return 'in_progress';
+  if (low.includes('active') || low.includes('submitted')) return 'active';
+  return null;
+}
+
 function tryParseTabular(text: string): { customers: any[]; formatDetected: string } | null {
   const lines = text.split('\n');
 
@@ -100,9 +116,9 @@ function tryParseTabular(text: string): { customers: any[]; formatDetected: stri
         return headers.findIndex((h) => h.includes('name') && isNotCompany(h));
       })();
 
-  const phoneIdx   = col('billing number', 'billing', 'phone');
+  const phoneIdx   = col('contact number', 'billing number', 'billing', 'phone', 'mobile', 'cell');
   const emailIdx   = col('email');
-  const streetIdx  = col('street', 'service address');
+  const streetIdx  = col('street', 'service address', 'address');
   const cityIdx    = col('city');
   const stateIdx   = col('state');
   const zipIdx     = col('zip', 'postal');
@@ -120,8 +136,8 @@ function tryParseTabular(text: string): { customers: any[]; formatDetected: stri
     if (explicit !== -1) return explicit;
     return headers.findIndex((h) =>
       (h.includes('date created') || h.includes('created date') || h === 'created' ||
-       h.includes('created at') || h.includes('order date') || h.includes('submitted date') ||
-       h === 'date')
+       h.includes('create date') || h.includes('created at') || h.includes('order date') ||
+       h.includes('submitted date') || h === 'date')
     );
   })();
   const installTIdx = headers.findIndex((h) =>
@@ -153,6 +169,7 @@ function tryParseTabular(text: string): { customers: any[]; formatDetected: stri
     const addrParts = [street, [city, state].filter(Boolean).join(', ') || null, zip].filter(Boolean);
     const addr = addrParts.length > 0 ? addrParts.join(' ') : null;
 
+    const rawStatus = cell(c, statusIdx);
     customers.push({
       name,
       email,
@@ -164,7 +181,8 @@ function tryParseTabular(text: string): { customers: any[]; formatDetected: stri
       referralSource: null,
       leadSize: normLeadSize(cell(c, leadIdx)),
       orderNumber: cell(c, orderIdx),
-      notes: cell(c, statusIdx),
+      notes: rawStatus,
+      status: normStatus(rawStatus),
       confidence: phone && addr ? 95 : addr ? 75 : phone ? 65 : 50,
     });
   }
@@ -198,6 +216,7 @@ Fields per customer (use null when missing):
 - isReferral: true only if the source explicitly indicates a referral; otherwise false
 - referralSource: string or null (null unless isReferral is true)
 - leadSize: exactly "500MB", "1GIG", "2GIG", or null
+- status: one of "active", "cancelled", "completed", "paid", "not_paid", "in_progress", or null. Map free-form order statuses (e.g. "CANCELLED" -> "cancelled", "Submitted - COMPLETED" -> "completed", "Submitted - PROVIDER IN PROCESS" -> "in_progress")
 - confidence: 95 (name+phone+address), 70 (missing phone), 50 (minimal)
 Return JSON: {"customers":[{...}],"formatDetected":"FREE_TEXT"}`,
       },
@@ -223,6 +242,7 @@ Return JSON: {"customers":[{...}],"formatDetected":"FREE_TEXT"}`,
           leadSize: normLeadSize(c.leadSize),
           orderNumber: nullish(c.orderNumber),
           notes: nullish(c.notes),
+          status: normStatus(typeof c.status === 'string' ? c.status : c.notes),
           confidence: typeof c.confidence === 'number' ? c.confidence : 70,
         };
       })

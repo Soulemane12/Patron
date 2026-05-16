@@ -20,9 +20,11 @@ export default function CustomerDetailsModal({
   if (!isOpen || !customer) return null;
 
   const parseDateLocal = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
-  
-  const getEmailSchedule = (installationDate: string) => {
+
+  const getEmailSchedule = (installationDate: string | null | undefined) => {
+    if (!installationDate) return { dayBefore: '—', dayOf: '—', followUp: '—' };
     const installDate = parseDateLocal(installationDate);
+    if (isNaN(installDate.getTime())) return { dayBefore: '—', dayOf: '—', followUp: '—' };
     const dayBefore = new Date(installDate);
     dayBefore.setDate(dayBefore.getDate() - 1);
     const dayOf = new Date(installDate);
@@ -125,7 +127,7 @@ export default function CustomerDetailsModal({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <span className="text-gray-900">
-                    {parseDateLocal(customer.installation_date).toLocaleDateString()}
+                    {customer.installation_date ? parseDateLocal(customer.installation_date).toLocaleDateString() : '—'}
                   </span>
                 </div>
               </div>
@@ -136,7 +138,7 @@ export default function CustomerDetailsModal({
                   <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-gray-900">{customer.installation_time}</span>
+                  <span className="text-gray-900">{customer.installation_time || '—'}</span>
                 </div>
               </div>
             </div>

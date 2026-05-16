@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import LoadingSpinner from './LoadingSpinner';
 
+type CustomerStatus = 'active' | 'cancelled' | 'completed' | 'paid' | 'not_paid' | 'in_progress';
+
 interface CustomerRow {
   _id: string;
   selected: boolean;
@@ -18,8 +20,11 @@ interface CustomerRow {
   leadSize: '500MB' | '1GIG' | '2GIG' | null;
   orderNumber: string | null;
   notes: string | null;
+  status: CustomerStatus | null;
   confidence: number;
 }
+
+const VALID_STATUS: CustomerStatus[] = ['active', 'cancelled', 'completed', 'paid', 'not_paid', 'in_progress'];
 
 const nz = (v: string | null | undefined): string | null => {
   if (v == null) return null;
@@ -94,6 +99,7 @@ export default function BatchImport({ user, onCustomersAdded }: BatchImportProps
           leadSize: (c.leadSize === '500MB' || c.leadSize === '1GIG' || c.leadSize === '2GIG') ? c.leadSize : null,
           orderNumber: nz(c.orderNumber),
           notes: nz(c.notes),
+          status: VALID_STATUS.includes(c.status) ? (c.status as CustomerStatus) : null,
           confidence: c.confidence || 0,
         }))
       );
@@ -136,7 +142,7 @@ export default function BatchImport({ user, onCustomersAdded }: BatchImportProps
             service_address: nz(row.serviceAddress),
             installation_date: nz(row.installationDate),
             installation_time: nz(row.installationTime),
-            status: 'active',
+            status: row.status || 'active',
             is_referral: row.isReferral || false,
             referral_source: row.isReferral ? nz(row.referralSource) : null,
             lead_size: row.leadSize || null,
