@@ -1093,16 +1093,16 @@ export default function Home() {
   const filterAndSortCustomers = useCallback((term: string, filter: string, sort: string, order: 'asc' | 'desc', location: string = 'all', gigSize: string = 'all') => {
     let filtered = [...customers];
     
-    // Apply search filter
+    // Apply search filter — null-safe (batch imports may have null email/date/time)
     if (term.trim()) {
       const lowerCaseTerm = term.toLowerCase();
-      filtered = filtered.filter(customer => 
-        customer.name.toLowerCase().includes(lowerCaseTerm) ||
-        customer.email.toLowerCase().includes(lowerCaseTerm) ||
-        customer.phone.toLowerCase().includes(lowerCaseTerm) ||
-        customer.service_address.toLowerCase().includes(lowerCaseTerm) ||
-        customer.installation_date.includes(lowerCaseTerm) ||
-        customer.installation_time.toLowerCase().includes(lowerCaseTerm)
+      filtered = filtered.filter(customer =>
+        (customer.name ?? '').toLowerCase().includes(lowerCaseTerm) ||
+        (customer.email ?? '').toLowerCase().includes(lowerCaseTerm) ||
+        (customer.phone ?? '').toLowerCase().includes(lowerCaseTerm) ||
+        (customer.service_address ?? '').toLowerCase().includes(lowerCaseTerm) ||
+        (customer.installation_date ?? '').toLowerCase().includes(lowerCaseTerm) ||
+        (customer.installation_time ?? '').toLowerCase().includes(lowerCaseTerm)
       );
     }
     
@@ -1126,17 +1126,18 @@ export default function Home() {
     } else if (filter === 'referrals') {
       filtered = filtered.filter(customer => customer.is_referral === true);
     }
-    // Date filters
+    // Date filters — skip rows with no installation_date
     else if (filter === 'upcoming') {
-      filtered = filtered.filter(customer => customer.installation_date >= todayString);
+      filtered = filtered.filter(customer => !!customer.installation_date && customer.installation_date >= todayString);
     } else if (filter === 'past') {
-      filtered = filtered.filter(customer => customer.installation_date < todayString);
+      filtered = filtered.filter(customer => !!customer.installation_date && customer.installation_date < todayString);
     } else if (filter === 'this_week') {
       const oneWeekFromNow = new Date();
       oneWeekFromNow.setDate(today.getDate() + 7);
       const oneWeekString = oneWeekFromNow.toISOString().split('T')[0];
-      filtered = filtered.filter(customer => 
-        customer.installation_date >= todayString && 
+      filtered = filtered.filter(customer =>
+        !!customer.installation_date &&
+        customer.installation_date >= todayString &&
         customer.installation_date <= oneWeekString
       );
     } else if (filter === 'this_month') {
@@ -1144,16 +1145,17 @@ export default function Home() {
       const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       const firstDayString = firstDayOfMonth.toISOString().split('T')[0];
       const lastDayString = lastDayOfMonth.toISOString().split('T')[0];
-      filtered = filtered.filter(customer => 
-        customer.installation_date >= firstDayString && 
+      filtered = filtered.filter(customer =>
+        !!customer.installation_date &&
+        customer.installation_date >= firstDayString &&
         customer.installation_date <= lastDayString
       );
     }
-    
+
     // Apply location filter
     if (location !== 'all') {
       filtered = filtered.filter(customer => {
-        const addressParts = customer.service_address.split(',');
+        const addressParts = (customer.service_address ?? '').split(',');
         let customerLocation = 'Unknown';
         if (addressParts.length > 1) {
           const cityState = addressParts[addressParts.length - 2]?.trim();
@@ -1176,20 +1178,20 @@ export default function Home() {
       
       switch (sort) {
         case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
+          aValue = (a.name ?? '').toLowerCase();
+          bValue = (b.name ?? '').toLowerCase();
           break;
         case 'installation_date':
-          aValue = new Date(a.installation_date);
-          bValue = new Date(b.installation_date);
+          aValue = a.installation_date ? new Date(a.installation_date) : new Date(0);
+          bValue = b.installation_date ? new Date(b.installation_date) : new Date(0);
           break;
         case 'created_at':
           aValue = new Date(a.created_at);
           bValue = new Date(b.created_at);
           break;
         case 'email':
-          aValue = a.email.toLowerCase();
-          bValue = b.email.toLowerCase();
+          aValue = (a.email ?? '').toLowerCase();
+          bValue = (b.email ?? '').toLowerCase();
           break;
         case 'status':
           // Define an order for statuses: cancelled first, then completed, then not_paid, then paid, then in_progress, then active
