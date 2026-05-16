@@ -1630,7 +1630,7 @@ export default function Home() {
                           checked={allVisibleSelected}
                           ref={(el) => { if (el) el.indeterminate = someVisibleSelected; }}
                           onChange={toggleSelectAllVisible}
-                          className="h-4 w-4 text-blue-600 rounded"
+                          className="h-5 w-5 accent-blue-600 cursor-pointer"
                         />
                         <span className="text-sm text-black">
                           {selectedIds.size > 0
@@ -1842,14 +1842,18 @@ export default function Home() {
                       <>
                         <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-3">
                           <div className="flex items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.has(customer.id)}
-                              onChange={() => toggleRowSelected(customer.id)}
+                            <label
+                              className="mt-1 inline-flex items-center justify-center h-6 w-6 cursor-pointer flex-shrink-0"
                               onClick={(e) => e.stopPropagation()}
-                              className="mt-1 h-4 w-4 text-blue-600 rounded flex-shrink-0"
-                              aria-label={`Select ${customer.name}`}
-                            />
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(customer.id)}
+                                onChange={() => toggleRowSelected(customer.id)}
+                                className="h-5 w-5 accent-blue-600 cursor-pointer"
+                                aria-label={`Select ${customer.name}`}
+                              />
+                            </label>
                           <div>
                             <div className="flex items-center gap-2 mb-1">
                               <h3
