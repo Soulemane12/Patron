@@ -1614,8 +1614,7 @@ export default function Home() {
                           type="checkbox"
                           checked={allVisibleSelected}
                           ref={(el) => { if (el) el.indeterminate = someVisibleSelected; }}
-                          onChange={() => {}}
-                          onClick={(e) => {
+                          onChange={(e) => {
                             e.stopPropagation();
                             toggleSelectAllVisible();
                           }}
@@ -1839,8 +1838,7 @@ export default function Home() {
                               type="checkbox"
                               data-row-id={customer.id}
                               checked={selectedIds.includes(customer.id)}
-                              onChange={() => {}}
-                              onClick={(e) => {
+                              onChange={(e) => {
                                 e.stopPropagation();
                                 toggleRowSelected(customer.id);
                               }}
