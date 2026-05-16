@@ -98,6 +98,8 @@ export default function Home() {
   const [gigSizeFilter, setGigSizeFilter] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkActing, setIsBulkActing] = useState(false);
   const [calendarStatusFilter, setCalendarStatusFilter] = useState<string>('all');
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
@@ -990,6 +992,80 @@ export default function Home() {
     }
   };
 
+  // ── Bulk selection ──────────────────────────────────────────────────────────
+  const toggleRowSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = filteredCustomers.map((c) => c.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      // Deselect just the visible ones (keep any off-screen selections — but we only show visible, so effectively clear)
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (selectedIds.size === 0 || !user) return;
+    const count = selectedIds.size;
+    if (!window.confirm(`Delete ${count} customer${count === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    setIsBulkActing(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .in('id', ids)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      clearSelection();
+      await loadCustomers();
+    } catch (e) {
+      console.error('Bulk delete failed:', e);
+      setError('Failed to delete selected customers. Please try again.');
+    } finally {
+      setIsBulkActing(false);
+    }
+  };
+
+  const bulkUpdateStatus = async (status: Customer['status']) => {
+    if (selectedIds.size === 0 || !user) return;
+    setIsBulkActing(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase
+        .from('customers')
+        .update({ status })
+        .in('id', ids)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      clearSelection();
+      await loadCustomers();
+    } catch (e) {
+      console.error('Bulk status update failed:', e);
+      setError('Failed to update selected customers. Please try again.');
+    } finally {
+      setIsBulkActing(false);
+    }
+  };
+
   const startEditingCustomer = (customer: Customer) => {
     setEditingCustomer(customer);
   };
@@ -1541,6 +1617,76 @@ export default function Home() {
             
             {filteredCustomers.length > 0 ? (
               <div className="space-y-4">
+                {/* Bulk selection toolbar */}
+                {(() => {
+                  const visibleIds = filteredCustomers.map((c) => c.id);
+                  const allVisibleSelected = visibleIds.every((id) => selectedIds.has(id));
+                  const someVisibleSelected = !allVisibleSelected && visibleIds.some((id) => selectedIds.has(id));
+                  return (
+                    <div className="flex flex-wrap items-center gap-3 p-2 md:p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          ref={(el) => { if (el) el.indeterminate = someVisibleSelected; }}
+                          onChange={toggleSelectAllVisible}
+                          className="h-4 w-4 text-blue-600 rounded"
+                        />
+                        <span className="text-sm text-black">
+                          {selectedIds.size > 0
+                            ? `${selectedIds.size} selected`
+                            : `Select all (${filteredCustomers.length})`}
+                        </span>
+                      </label>
+                      {selectedIds.size > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 ml-auto">
+                          <button
+                            disabled={isBulkActing}
+                            onClick={() => bulkUpdateStatus('completed')}
+                            className="px-3 py-1 text-xs md:text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            Mark Completed
+                          </button>
+                          <button
+                            disabled={isBulkActing}
+                            onClick={() => bulkUpdateStatus('paid')}
+                            className="px-3 py-1 text-xs md:text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                          >
+                            Mark Paid
+                          </button>
+                          <button
+                            disabled={isBulkActing}
+                            onClick={() => bulkUpdateStatus('active')}
+                            className="px-3 py-1 text-xs md:text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            Mark Active
+                          </button>
+                          <button
+                            disabled={isBulkActing}
+                            onClick={() => bulkUpdateStatus('cancelled')}
+                            className="px-3 py-1 text-xs md:text-sm bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
+                          >
+                            Mark Cancelled
+                          </button>
+                          <button
+                            disabled={isBulkActing}
+                            onClick={bulkDelete}
+                            className="px-3 py-1 text-xs md:text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            disabled={isBulkActing}
+                            onClick={clearSelection}
+                            className="px-3 py-1 text-xs md:text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {filteredCustomers.map((customer) => {
                 const emailSchedule = getEmailSchedule(customer.installation_date);
                 return (
@@ -1695,9 +1841,18 @@ export default function Home() {
                       /* View Mode */
                       <>
                         <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-3">
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(customer.id)}
+                              onChange={() => toggleRowSelected(customer.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1 h-4 w-4 text-blue-600 rounded flex-shrink-0"
+                              aria-label={`Select ${customer.name}`}
+                            />
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 
+                              <h3
                                 className="font-semibold text-base md:text-lg text-black cursor-pointer hover:text-blue-600 transition-colors"
                                 onClick={() => openCustomerModal(customer)}
                                 title="Click to view full details"
@@ -1776,7 +1931,7 @@ export default function Home() {
                               </span>
                             </p>
                             {customer.is_referral && customer.referral_source && (
-                              <p 
+                              <p
                                 className="text-sm md:text-base text-purple-700 mt-1 cursor-pointer hover:text-purple-900 transition-colors"
                                 onClick={() => openCustomerModal(customer)}
                                 title="Click to view full details"
@@ -1784,6 +1939,7 @@ export default function Home() {
                                 <span className="font-medium">Referred by:</span> {customer.referral_source}
                               </p>
                             )}
+                          </div>
                           </div>
                           <div className="flex gap-2 mt-2 md:mt-0">
                             <button
