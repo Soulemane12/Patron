@@ -98,7 +98,7 @@ export default function Home() {
   const [gigSizeFilter, setGigSizeFilter] = useState<string>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkActing, setIsBulkActing] = useState(false);
   const [calendarStatusFilter, setCalendarStatusFilter] = useState<string>('all');
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
@@ -994,45 +994,31 @@ export default function Home() {
 
   // ── Bulk selection ──────────────────────────────────────────────────────────
   const toggleRowSelected = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   };
 
-  const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => setSelectedIds([]);
 
   const toggleSelectAllVisible = () => {
     const visibleIds = filteredCustomers.map((c) => c.id);
-    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
     if (allSelected) {
-      // Deselect just the visible ones (keep any off-screen selections — but we only show visible, so effectively clear)
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        visibleIds.forEach((id) => next.delete(id));
-        return next;
-      });
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
     } else {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        visibleIds.forEach((id) => next.add(id));
-        return next;
-      });
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
     }
   };
 
   const bulkDelete = async () => {
-    if (selectedIds.size === 0 || !user) return;
-    const count = selectedIds.size;
+    if (selectedIds.length === 0 || !user) return;
+    const count = selectedIds.length;
     if (!window.confirm(`Delete ${count} customer${count === 1 ? '' : 's'}? This cannot be undone.`)) return;
     setIsBulkActing(true);
     try {
-      const ids = Array.from(selectedIds);
       const { error } = await supabase
         .from('customers')
         .delete()
-        .in('id', ids)
+        .in('id', selectedIds)
         .eq('user_id', user.id);
       if (error) throw error;
       clearSelection();
@@ -1046,14 +1032,13 @@ export default function Home() {
   };
 
   const bulkUpdateStatus = async (status: Customer['status']) => {
-    if (selectedIds.size === 0 || !user) return;
+    if (selectedIds.length === 0 || !user) return;
     setIsBulkActing(true);
     try {
-      const ids = Array.from(selectedIds);
       const { error } = await supabase
         .from('customers')
         .update({ status })
-        .in('id', ids)
+        .in('id', selectedIds)
         .eq('user_id', user.id);
       if (error) throw error;
       clearSelection();
@@ -1620,8 +1605,8 @@ export default function Home() {
                 {/* Bulk selection toolbar */}
                 {(() => {
                   const visibleIds = filteredCustomers.map((c) => c.id);
-                  const allVisibleSelected = visibleIds.every((id) => selectedIds.has(id));
-                  const someVisibleSelected = !allVisibleSelected && visibleIds.some((id) => selectedIds.has(id));
+                  const allVisibleSelected = visibleIds.every((id) => selectedIds.includes(id));
+                  const someVisibleSelected = !allVisibleSelected && visibleIds.some((id) => selectedIds.includes(id));
                   return (
                     <div className="flex flex-wrap items-center gap-3 p-2 md:p-3 bg-gray-50 border border-gray-200 rounded-lg">
                       <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1633,12 +1618,12 @@ export default function Home() {
                           className="h-5 w-5 accent-blue-600 cursor-pointer"
                         />
                         <span className="text-sm text-black">
-                          {selectedIds.size > 0
-                            ? `${selectedIds.size} selected`
+                          {selectedIds.length > 0
+                            ? `${selectedIds.length} selected`
                             : `Select all (${filteredCustomers.length})`}
                         </span>
                       </label>
-                      {selectedIds.size > 0 && (
+                      {selectedIds.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2 ml-auto">
                           <button
                             disabled={isBulkActing}
@@ -1842,18 +1827,14 @@ export default function Home() {
                       <>
                         <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-3">
                           <div className="flex items-start gap-3">
-                            <label
-                              className="mt-1 inline-flex items-center justify-center h-6 w-6 cursor-pointer flex-shrink-0"
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(customer.id)}
+                              onChange={() => toggleRowSelected(customer.id)}
                               onClick={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.has(customer.id)}
-                                onChange={() => toggleRowSelected(customer.id)}
-                                className="h-5 w-5 accent-blue-600 cursor-pointer"
-                                aria-label={`Select ${customer.name}`}
-                              />
-                            </label>
+                              className="mt-1 h-5 w-5 accent-blue-600 cursor-pointer flex-shrink-0"
+                              aria-label={`Select ${customer.name}`}
+                            />
                           <div>
                             <div className="flex items-center gap-2 mb-1">
                               <h3
