@@ -8,18 +8,24 @@ interface CustomerRow {
   _id: string;
   selected: boolean;
   name: string;
-  email: string;
-  phone: string;
-  serviceAddress: string;
-  installationDate: string;
-  installationTime: string;
+  email: string | null;
+  phone: string | null;
+  serviceAddress: string | null;
+  installationDate: string | null;
+  installationTime: string | null;
   isReferral: boolean;
-  referralSource: string;
-  leadSize: '500MB' | '1GIG' | '2GIG' | undefined;
-  orderNumber: string;
-  notes: string;
+  referralSource: string | null;
+  leadSize: '500MB' | '1GIG' | '2GIG' | null;
+  orderNumber: string | null;
+  notes: string | null;
   confidence: number;
 }
+
+const nz = (v: string | null | undefined): string | null => {
+  if (v == null) return null;
+  const t = v.trim();
+  return t.length === 0 ? null : t;
+};
 
 interface BatchImportProps {
   user: { id: string } | null;
@@ -78,16 +84,16 @@ export default function BatchImport({ user, onCustomersAdded }: BatchImportProps
           _id: `row-${i}-${Date.now()}`,
           selected: true,
           name: c.name || '',
-          email: c.email || '',
-          phone: c.phone || '',
-          serviceAddress: c.serviceAddress || '',
-          installationDate: c.installationDate || '',
-          installationTime: c.installationTime || '',
-          isReferral: c.isReferral || false,
-          referralSource: c.referralSource || '',
-          leadSize: c.leadSize,
-          orderNumber: c.orderNumber || '',
-          notes: c.notes || '',
+          email: nz(c.email),
+          phone: nz(c.phone),
+          serviceAddress: nz(c.serviceAddress),
+          installationDate: nz(c.installationDate),
+          installationTime: nz(c.installationTime),
+          isReferral: c.isReferral === true,
+          referralSource: nz(c.referralSource),
+          leadSize: (c.leadSize === '500MB' || c.leadSize === '1GIG' || c.leadSize === '2GIG') ? c.leadSize : null,
+          orderNumber: nz(c.orderNumber),
+          notes: nz(c.notes),
           confidence: c.confidence || 0,
         }))
       );
@@ -125,20 +131,14 @@ export default function BatchImport({ user, onCustomersAdded }: BatchImportProps
           {
             user_id: user.id,
             name: row.name,
-            email: row.email,
-            phone: row.phone,
-            service_address: row.serviceAddress,
-            installation_date:
-              row.installationDate && row.installationDate !== 'Not provided' && row.installationDate !== ''
-                ? row.installationDate
-                : new Date().toISOString().split('T')[0],
-            installation_time:
-              row.installationTime && row.installationTime !== 'Not provided'
-                ? row.installationTime
-                : null,
+            email: nz(row.email),
+            phone: nz(row.phone),
+            service_address: nz(row.serviceAddress),
+            installation_date: nz(row.installationDate),
+            installation_time: nz(row.installationTime),
             status: 'active',
             is_referral: row.isReferral || false,
-            referral_source: row.isReferral ? row.referralSource : null,
+            referral_source: row.isReferral ? nz(row.referralSource) : null,
             lead_size: row.leadSize || null,
           },
         ]);

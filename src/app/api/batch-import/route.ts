@@ -7,12 +7,60 @@ export const maxDuration = 60;
 // ── Direct column parser for tab-separated exports (BASS, Excel, etc.) ────────
 // Used when the data has a clear header row — instant, no API call needed.
 // Falls back to AI for free-form text.
+//
+// Field policy: missing values are returned as `null`, never as "" or placeholder
+// strings. Downstream code (review UI, DB insert) treats null as "not provided".
 
-function formatPhone(raw: string): string {
-  const d = raw.replace(/\D/g, '');
+function nullish(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const t = v.trim();
+  if (t.length === 0) return null;
+  // Common spreadsheet "empty" sentinels
+  const low = t.toLowerCase();
+  if (low === 'n/a' || low === 'na' || low === 'null' || low === 'not provided' || low === '-') return null;
+  return t;
+}
+
+function formatPhone(raw: string | null | undefined): string | null {
+  const t = nullish(raw);
+  if (!t) return null;
+  const d = t.replace(/\D/g, '');
   if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
   if (d.length === 11 && d[0] === '1') return `(${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
-  return raw;
+  return d.length > 0 ? t : null;
+}
+
+function normDate(v: string | null | undefined): string | null {
+  const t = nullish(v);
+  if (!t) return null;
+  // Strip trailing time portion ("2026-04-28 14:32:00" → "2026-04-28")
+  const head = t.split(/[\sT]/)[0];
+  // Already YYYY-MM-DD
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(head);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  // MM/DD/YYYY or M/D/YY
+  m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/.exec(head);
+  if (m) {
+    const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${yr}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+  }
+  // Fallback: let Date parse it (handles "Apr 28, 2026" etc.)
+  const d = new Date(t);
+  if (!isNaN(d.getTime())) {
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${da}`;
+  }
+  return null;
+}
+
+const VALID_LEAD = ['500MB', '1GIG', '2GIG'] as const;
+function normLeadSize(v: string | null | undefined): '500MB' | '1GIG' | '2GIG' | null {
+  const t = nullish(v);
+  if (!t) return null;
+  const up = t.toUpperCase().replace(/\s/g, '');
+  return (VALID_LEAD as readonly string[]).includes(up) ? (up as any) : null;
 }
 
 function tryParseTabular(text: string): { customers: any[]; formatDetected: string } | null {
@@ -52,45 +100,72 @@ function tryParseTabular(text: string): { customers: any[]; formatDetected: stri
         return headers.findIndex((h) => h.includes('name') && isNotCompany(h));
       })();
 
-  const phoneIdx  = col('billing number', 'billing', 'phone');
-  const streetIdx = col('street');
-  const cityIdx   = col('city');
-  const stateIdx  = col('state');
-  const zipIdx    = col('zip');
-  const orderIdx  = col('order #', 'order#', 'order number');
-  const statusIdx = col('order status', 'status');
+  const phoneIdx   = col('billing number', 'billing', 'phone');
+  const emailIdx   = col('email');
+  const streetIdx  = col('street', 'service address');
+  const cityIdx    = col('city');
+  const stateIdx   = col('state');
+  const zipIdx     = col('zip', 'postal');
+  const orderIdx   = col('order #', 'order#', 'order number');
+  const statusIdx  = col('order status', 'status');
+  // Installation date: prefer explicit "install/installation/scheduled/service/appointment date".
+  // If none of those exist, fall back to creation-style columns ("date created", "order date",
+  // "created", "submitted") — for order-export TSVs the creation date is what the user treats
+  // as the install date.
+  const installDIdx = (() => {
+    const explicit = headers.findIndex((h) =>
+      (h.includes('install') || h.includes('scheduled') || h.includes('appointment') ||
+       (h.includes('service') && h.includes('date'))) && h.includes('date')
+    );
+    if (explicit !== -1) return explicit;
+    return headers.findIndex((h) =>
+      (h.includes('date created') || h.includes('created date') || h === 'created' ||
+       h.includes('created at') || h.includes('order date') || h.includes('submitted date') ||
+       h === 'date')
+    );
+  })();
+  const installTIdx = headers.findIndex((h) =>
+    (h.includes('install') || h.includes('scheduled') || h.includes('appointment') ||
+     (h.includes('service') && h.includes('time'))) && h.includes('time')
+  );
+  const leadIdx    = col('lead size', 'package', 'speed', 'plan');
 
   if (nameIdx === -1 && !(firstIdx >= 0 && lastIdx >= 0)) return null;
+
+  const cell = (row: string[], idx: number): string | null =>
+    idx >= 0 ? nullish(row[idx]) : null;
 
   const customers: any[] = [];
   for (let i = headerIdx + 1; i < lines.length; i++) {
     if (!lines[i].includes('\t')) continue;
-    const c = lines[i].split('\t').map((v) => v.trim());
+    const c = lines[i].split('\t');
     const name = nameIdx === -2
-      ? `${c[firstIdx] || ''} ${c[lastIdx] || ''}`.trim()
-      : nameIdx >= 0 ? c[nameIdx] || '' : '';
-    if (name.length < 2) continue;
+      ? nullish(`${c[firstIdx] || ''} ${c[lastIdx] || ''}`)
+      : cell(c, nameIdx);
+    if (!name || name.length < 2) continue;
 
-    const phone  = phoneIdx  >= 0 ? c[phoneIdx]  || '' : '';
-    const street = streetIdx >= 0 ? c[streetIdx] || '' : '';
-    const city   = cityIdx   >= 0 ? c[cityIdx]   || '' : '';
-    const state  = stateIdx  >= 0 ? c[stateIdx]  || '' : '';
-    const zip    = zipIdx    >= 0 ? c[zipIdx]    || '' : '';
-    const addr   = [street, [city, state].filter(Boolean).join(', '), zip].filter(Boolean).join(' ');
+    const phone  = formatPhone(cell(c, phoneIdx));
+    const email  = cell(c, emailIdx);
+    const street = cell(c, streetIdx);
+    const city   = cell(c, cityIdx);
+    const state  = cell(c, stateIdx);
+    const zip    = cell(c, zipIdx);
+    const addrParts = [street, [city, state].filter(Boolean).join(', ') || null, zip].filter(Boolean);
+    const addr = addrParts.length > 0 ? addrParts.join(' ') : null;
 
     customers.push({
       name,
-      email: '',
-      phone: formatPhone(phone),
+      email,
+      phone,
       serviceAddress: addr,
-      installationDate: '',
-      installationTime: '',
+      installationDate: normDate(cell(c, installDIdx)),
+      installationTime: cell(c, installTIdx),
       isReferral: false,
-      referralSource: '',
-      leadSize: null,
-      orderNumber: orderIdx  >= 0 ? c[orderIdx]  || '' : '',
-      notes:       statusIdx >= 0 ? c[statusIdx] || '' : '',
-      confidence:  name && phone && addr ? 95 : name && addr ? 75 : 60,
+      referralSource: null,
+      leadSize: normLeadSize(cell(c, leadIdx)),
+      orderNumber: cell(c, orderIdx),
+      notes: cell(c, statusIdx),
+      confidence: phone && addr ? 95 : addr ? 75 : phone ? 65 : 50,
     });
   }
 
@@ -110,8 +185,20 @@ async function parseWithAI(text: string): Promise<{ customers: any[]; formatDete
       {
         role: 'system',
         content: `Extract customer records and return JSON.
-- name, phone (XXX) XXX-XXXX, email (or ""), serviceAddress, installationDate YYYY-MM-DD (or ""), installationTime (or ""), orderNumber (or ""), notes, isReferral false, referralSource "", leadSize null
-- confidence: 95 name+phone+address, 70 missing phone, 50 minimal
+CRITICAL: if a field is not present in the source data, return null. Never invent, guess, or substitute placeholders ("Not provided", "N/A", "", today's date, etc.).
+Fields per customer (use null when missing):
+- name: string (required; skip records with no name)
+- phone: formatted (XXX) XXX-XXXX, else null
+- email: string or null
+- serviceAddress: full address string or null
+- installationDate: YYYY-MM-DD or null (do NOT default to today). If no explicit install/scheduled/service/appointment date exists, accept a creation/order date ("Date Created", "Order Date", "Submitted") and convert to YYYY-MM-DD
+- installationTime: string or null
+- orderNumber: string or null
+- notes: string or null
+- isReferral: true only if the source explicitly indicates a referral; otherwise false
+- referralSource: string or null (null unless isReferral is true)
+- leadSize: exactly "500MB", "1GIG", "2GIG", or null
+- confidence: 95 (name+phone+address), 70 (missing phone), 50 (minimal)
 Return JSON: {"customers":[{...}],"formatDetected":"FREE_TEXT"}`,
       },
       { role: 'user', content: `Extract all customer records:\n\n${text.slice(0, 6000)}` },
@@ -120,13 +207,26 @@ Return JSON: {"customers":[{...}],"formatDetected":"FREE_TEXT"}`,
 
   const parsed = JSON.parse(completion.choices[0]?.message?.content || '{"customers":[]}');
   return {
-    customers: (parsed.customers || []).map((c: any) => ({
-      name: c.name || '', email: c.email || '', phone: c.phone || '',
-      serviceAddress: c.serviceAddress || '', installationDate: c.installationDate || '',
-      installationTime: c.installationTime || '', isReferral: false, referralSource: '',
-      leadSize: c.leadSize || null, orderNumber: c.orderNumber || '', notes: c.notes || '',
-      confidence: typeof c.confidence === 'number' ? c.confidence : 70,
-    })),
+    customers: (parsed.customers || [])
+      .map((c: any) => {
+        const name = nullish(c.name);
+        if (!name) return null;
+        return {
+          name,
+          email: nullish(c.email),
+          phone: formatPhone(c.phone),
+          serviceAddress: nullish(c.serviceAddress),
+          installationDate: normDate(c.installationDate),
+          installationTime: nullish(c.installationTime),
+          isReferral: c.isReferral === true,
+          referralSource: c.isReferral === true ? nullish(c.referralSource) : null,
+          leadSize: normLeadSize(c.leadSize),
+          orderNumber: nullish(c.orderNumber),
+          notes: nullish(c.notes),
+          confidence: typeof c.confidence === 'number' ? c.confidence : 70,
+        };
+      })
+      .filter(Boolean),
     formatDetected: parsed.formatDetected || 'FREE_TEXT',
   };
 }
