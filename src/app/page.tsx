@@ -101,7 +101,7 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkActing, setIsBulkActing] = useState(false);
   const [calendarStatusFilter, setCalendarStatusFilter] = useState<string>('all');
-  const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const lastActivityRef = useRef<number>(Date.now());
   const [isRefreshingSession, setIsRefreshingSession] = useState<boolean>(false);
   const [isManualSaving, setIsManualSaving] = useState(false); // Lock to prevent auto-save interference
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -299,21 +299,21 @@ export default function Home() {
     };
   }, [inputText, formattedInfo, isAuthenticated, user, loadDraftFromDatabase, loadFromLocalStorageFallback]);
 
-  // Track user activity to prevent automatic logouts
+  // Track user activity to prevent automatic logouts. Use a ref so we don't
+  // trigger a re-render on every mousedown/keydown — that previously combined
+  // with a lastActivity-dependent useEffect to tear down/rebuild the Supabase
+  // auth subscription mid-event, which silently dropped checkbox clicks.
   useEffect(() => {
     const updateActivity = () => {
-      setLastActivity(Date.now());
+      lastActivityRef.current = Date.now();
     };
-
-    // Track various user activities
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
     events.forEach(event => {
-      document.addEventListener(event, updateActivity, true);
+      document.addEventListener(event, updateActivity, { passive: true });
     });
-
     return () => {
       events.forEach(event => {
-        document.removeEventListener(event, updateActivity, true);
+        document.removeEventListener(event, updateActivity);
       });
     };
   }, []);
@@ -576,7 +576,7 @@ export default function Home() {
           setIsRefreshingSession(true);
           
           // Check if user has been active in the last 30 minutes
-          const timeSinceActivity = Date.now() - lastActivity;
+          const timeSinceActivity = Date.now() - lastActivityRef.current;
           const thirtyMinutes = 30 * 60 * 1000;
           
           if (timeSinceActivity < thirtyMinutes) {
@@ -624,7 +624,7 @@ export default function Home() {
       subscription.unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [router, isAuthenticated, user, lastActivity]);
+  }, [router, isAuthenticated, user]);
 
   // Calculate email notification dates
   const getEmailSchedule = (installationDate: string) => {
