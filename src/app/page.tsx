@@ -1614,7 +1614,11 @@ export default function Home() {
                           type="checkbox"
                           checked={allVisibleSelected}
                           ref={(el) => { if (el) el.indeterminate = someVisibleSelected; }}
-                          onChange={toggleSelectAllVisible}
+                          onChange={() => {}}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelectAllVisible();
+                          }}
                           className="h-5 w-5 accent-blue-600 cursor-pointer"
                         />
                         <span className="text-sm text-black">
@@ -1675,7 +1679,11 @@ export default function Home() {
                 {filteredCustomers.map((customer) => {
                 const emailSchedule = getEmailSchedule(customer.installation_date);
                 return (
-                  <div key={customer.id} className={`border ${editingCustomer?.id === customer.id ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200'} rounded-lg p-3 md:p-4 hover:shadow-md transition-shadow`}>
+                  <div key={customer.id} className={`border-2 ${
+                    editingCustomer?.id === customer.id ? 'border-yellow-400 bg-yellow-50' :
+                    selectedIds.includes(customer.id) ? 'border-blue-500 bg-blue-50' :
+                    'border-gray-200'
+                  } rounded-lg p-3 md:p-4 hover:shadow-md transition-shadow`}>
                     {editingCustomer?.id === customer.id ? (
                       /* Edit Mode */
                       <>
@@ -1829,9 +1837,13 @@ export default function Home() {
                           <div className="flex items-start gap-3">
                             <input
                               type="checkbox"
+                              data-row-id={customer.id}
                               checked={selectedIds.includes(customer.id)}
-                              onChange={() => toggleRowSelected(customer.id)}
-                              onClick={(e) => e.stopPropagation()}
+                              onChange={() => {}}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleRowSelected(customer.id);
+                              }}
                               className="mt-1 h-5 w-5 accent-blue-600 cursor-pointer flex-shrink-0"
                               aria-label={`Select ${customer.name}`}
                             />
