@@ -13,6 +13,47 @@ interface MonthlyStats {
   count: number;
 }
 
+const US_STATE_ABBR = new Set([
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA',
+  'ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK',
+  'OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'
+]);
+
+// Pull the town/city out of a service address, regardless of whether the
+// address came from a single "Street, City, State Zip" entry or a batch
+// import whose columns land in a different order (e.g.
+// "3202, 28TH ST NE, HICKORY, US, 28601, NC").
+function extractTown(serviceAddress: string): string {
+  const parts = serviceAddress.split(',').map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) return 'Unknown';
+
+  const isNoise = (part: string) => {
+    if (/^\d{5}(-\d{4})?$/.test(part)) return true; // pure zip
+    if (/^(US|USA|United States)$/i.test(part)) return true; // country
+    if (US_STATE_ABBR.has(part.toUpperCase())) return true; // pure state code
+    if (/^[A-Za-z]{2}\s+\d{5}(-\d{4})?$/.test(part)) return true; // "NC 27302"
+    return false;
+  };
+
+  while (parts.length > 1 && isNoise(parts[parts.length - 1])) {
+    parts.pop();
+  }
+
+  let town = parts[parts.length - 1] || 'Unknown';
+  // Strip a trailing state/zip that got combined into the same segment,
+  // e.g. "Hickory NC 28601" -> "Hickory".
+  town = town.replace(/\s+[A-Za-z]{2}\s+\d{5}(-\d{4})?$/, '').trim();
+
+  if (!town) return 'Unknown';
+
+  // Normalize casing so "HICKORY" and "Hickory" count as the same area.
+  return town
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export default function StatsPage({ customers, onSwitchToCalendar }: StatsPageProps) {
   const [totalCustomers, setTotalCustomers] = useState<number>(0);
   const [upcomingInstallations, setUpcomingInstallations] = useState<number>(0);
@@ -148,21 +189,10 @@ export default function StatsPage({ customers, onSwitchToCalendar }: StatsPagePr
     
     setMostPopularDay(`${maxDay} (${maxCount} installations)`);
     
-    // Calculate top areas
+    // Calculate top areas (by town, not zip code)
     const areaCount: {[key: string]: number} = {};
     customers.forEach(c => {
-      // Extract city or zip code from address
-      const addressParts = c.service_address.split(',');
-      let area = 'Unknown';
-      
-      if (addressParts.length > 1) {
-        // Try to get city and state
-        const cityState = addressParts[addressParts.length - 2]?.trim();
-        if (cityState) {
-          area = cityState;
-        }
-      }
-      
+      const area = extractTown(c.service_address);
       areaCount[area] = (areaCount[area] || 0) + 1;
     });
     
