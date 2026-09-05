@@ -156,7 +156,7 @@ RETURN ONLY JSON - NO OTHER TEXT:
             content: `Extract customer information with maximum accuracy:\n\n${text}`
           }
         ],
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-120b',
         temperature: 0.01, // Maximum precision
         max_tokens: 1000,
       });
@@ -207,8 +207,16 @@ RETURN ONLY JSON - NO OTHER TEXT:
         };
       }
 
-      // Convert installation date to proper format for database
-      if (formattedData.installationDate && formattedData.installationDate !== 'Not provided') {
+      // Convert installation date to proper format for database.
+      // Skip re-parsing if it's already YYYY-MM-DD: `new Date('2025-07-29')`
+      // parses as UTC midnight, and reading it back with local getters
+      // (getFullYear/getMonth/getDate) rolls it back a day in timezones
+      // west of UTC, causing the install date to come back one day off.
+      if (
+        formattedData.installationDate &&
+        formattedData.installationDate !== 'Not provided' &&
+        !/^\d{4}-\d{2}-\d{2}$/.test(formattedData.installationDate)
+      ) {
         try {
           const date = new Date(formattedData.installationDate);
           if (!isNaN(date.getTime())) {
