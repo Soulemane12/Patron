@@ -549,34 +549,14 @@ export default function StatsPage({ customers, onSwitchToCalendar }: StatsPagePr
                   role="button"
                   tabIndex={0}
                   onClick={() => {
-                    const list = customers.filter(c => {
-                      const addressParts = c.service_address.split(',');
-                      let customerArea = 'Unknown';
-                      if (addressParts.length > 1) {
-                        const cityState = addressParts[addressParts.length - 2]?.trim();
-                        if (cityState) {
-                          customerArea = cityState;
-                        }
-                      }
-                      return customerArea === area.area;
-                    });
+                    const list = customers.filter(c => extractTown(c.service_address) === area.area);
                     setModalCustomers(list);
                     setModalTitle(`${area.area} Customers (${list.length})`);
                     setIsModalOpen(true);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
-                      const list = customers.filter(c => {
-                        const addressParts = c.service_address.split(',');
-                        let customerArea = 'Unknown';
-                        if (addressParts.length > 1) {
-                          const cityState = addressParts[addressParts.length - 2]?.trim();
-                          if (cityState) {
-                            customerArea = cityState;
-                          }
-                        }
-                        return customerArea === area.area;
-                      });
+                      const list = customers.filter(c => extractTown(c.service_address) === area.area);
                       setModalCustomers(list);
                       setModalTitle(`${area.area} Customers (${list.length})`);
                       setIsModalOpen(true);
