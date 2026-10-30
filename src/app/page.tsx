@@ -270,6 +270,25 @@ export default function Home() {
     }
   }, [isAuthenticated, user, draftLoaded, loadDraftFromDatabase]);
 
+  // Kick out users who are pending approval or paused. Network/server errors
+  // are ignored so flaky mobile connections don't sign out approved users.
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/check-approval', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }).catch(() => null);
+      if (!res?.ok) return;
+      const status = await res.json();
+      if (!status.isApproved || status.isPaused) {
+        await supabase.auth.signOut();
+        window.location.href = `/login?message=${status.isPaused ? 'paused' : 'pending'}`;
+      }
+    })();
+  }, [isAuthenticated, user?.id]);
+
   // Handle page visibility changes to restore form data when user returns
   useEffect(() => {
     const handleVisibilityChange = () => {

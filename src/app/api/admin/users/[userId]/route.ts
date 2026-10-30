@@ -79,3 +79,61 @@ export async function PUT(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// Decline a pending signup: deletes the account entirely.
+// Refuses approved users and users who have customers, so real accounts can't be wiped by accident.
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || authHeader !== 'Bearer soulemane') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { userId } = await params;
+
+    const { data: status, error: statusError } = await supabaseAdmin
+      .from('user_status')
+      .select('is_approved')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (statusError) {
+      console.error('Error checking user status:', statusError);
+      return NextResponse.json({ error: 'Failed to check user status' }, { status: 500 });
+    }
+
+    if (status?.is_approved) {
+      return NextResponse.json({ error: 'Only pending users can be declined' }, { status: 400 });
+    }
+
+    const { count, error: countError } = await supabaseAdmin
+      .from('customers')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (countError) {
+      console.error('Error counting customers:', countError);
+      return NextResponse.json({ error: 'Failed to check customers' }, { status: 500 });
+    }
+
+    if (count && count > 0) {
+      return NextResponse.json({ error: `User has ${count} customers; pause them instead` }, { status: 400 });
+    }
+
+    await supabaseAdmin.from('user_status').delete().eq('user_id', userId);
+
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (error) {
+      console.error('Error deleting user:', error);
+      return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('User decline API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

@@ -19,10 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Auto-approve new user so they can access the app immediately
+    // New users start pending until an admin accepts them on /admin
     await supabaseAdmin.from('user_status').insert({
       user_id: data.user.id,
-      is_approved: true,
+      is_approved: false,
       is_paused: false,
     });
 

@@ -46,6 +46,7 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -62,6 +63,7 @@ export default function AdminPage() {
     }
     const data = await res.json();
     setUsers(data.users);
+    setSelectedUser((prev) => (prev ? data.users.find((u: User) => u.id === prev.id) ?? null : null));
     setCustomers(data.customers);
     setAuthed(true);
     setLoading(false);
@@ -73,27 +75,31 @@ export default function AdminPage() {
     fetchData(password);
   };
 
-  const togglePause = async (userId: string, isPaused: boolean) => {
+  const runUserAction = async (userId: string, init: RequestInit) => {
     setActionLoading(userId);
-    await fetch('/api/admin/users/pause', {
-      method: 'POST',
+    setActionError('');
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      ...init,
       headers: { Authorization: `Bearer ${password}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, action: isPaused ? 'unpause' : 'pause' }),
-    });
+    }).catch(() => null);
+    if (!res?.ok) {
+      const data = await res?.json().catch(() => null);
+      setActionError(data?.error || 'Action failed');
+    }
     await fetchData(password);
     setActionLoading(null);
+    return res?.ok ?? false;
   };
 
-  const toggleApprove = async (userId: string, isApproved: boolean) => {
-    setActionLoading(userId);
-    await fetch('/api/admin/users/approve', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${password}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, action: isApproved ? 'disapprove' : 'approve' }),
-    });
-    await fetchData(password);
-    setActionLoading(null);
+  const updateUser = (userId: string, fields: { is_approved?: boolean; is_paused?: boolean }) =>
+    runUserAction(userId, { method: 'PUT', body: JSON.stringify(fields) });
+
+  const declineUser = async (user: User) => {
+    if (!confirm(`Decline ${user.email}? This deletes their account.`)) return;
+    await runUserAction(user.id, { method: 'DELETE' });
   };
+
+  const pendingUsers = users.filter((u) => !u.is_approved);
 
   const userCustomers = selectedUser
     ? customers.filter((c) => c.user_id === selectedUser.id)
@@ -153,6 +159,45 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
           <div className="text-sm text-gray-500">{users.length} users · {customers.length} total customers</div>
         </div>
+
+        {actionError && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded px-4 py-2">{actionError}</div>
+        )}
+
+        {/* Pending signups */}
+        {pendingUsers.length > 0 && (
+          <div className="mb-6 bg-white rounded-lg shadow overflow-hidden border-l-4 border-yellow-400">
+            <div className="px-4 py-3 border-b border-gray-100 font-medium text-gray-700 text-sm">
+              Pending requests ({pendingUsers.length})
+            </div>
+            <div className="divide-y divide-gray-100">
+              {pendingUsers.map((user) => (
+                <div key={user.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Signed up {new Date(user.created_at).toLocaleString()}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => updateUser(user.id, { is_approved: true })}
+                      disabled={actionLoading === user.id}
+                      className="text-sm px-3 py-1.5 rounded font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => declineUser(user)}
+                      disabled={actionLoading === user.id}
+                      className="text-sm px-3 py-1.5 rounded font-medium bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-6">
           {/* Users list */}
@@ -221,7 +266,7 @@ export default function AdminPage() {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => toggleApprove(selectedUser.id, selectedUser.is_approved)}
+                        onClick={() => updateUser(selectedUser.id, { is_approved: !selectedUser.is_approved })}
                         disabled={actionLoading === selectedUser.id}
                         className={`text-sm px-3 py-1.5 rounded font-medium ${
                           selectedUser.is_approved
@@ -229,10 +274,10 @@ export default function AdminPage() {
                             : 'bg-green-600 text-white hover:bg-green-700'
                         } disabled:opacity-50`}
                       >
-                        {selectedUser.is_approved ? 'Revoke' : 'Approve'}
+                        {selectedUser.is_approved ? 'Revoke' : 'Accept'}
                       </button>
                       <button
-                        onClick={() => togglePause(selectedUser.id, selectedUser.is_paused)}
+                        onClick={() => updateUser(selectedUser.id, { is_paused: !selectedUser.is_paused })}
                         disabled={actionLoading === selectedUser.id}
                         className={`text-sm px-3 py-1.5 rounded font-medium ${
                           selectedUser.is_paused

@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+const PENDING_MESSAGE = 'Your account is pending approval. You can log in once an admin accepts it.';
+const PAUSED_MESSAGE = 'Your account has been paused. Please contact the administrator.';
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -10,8 +13,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const message = new URLSearchParams(window.location.search).get('message');
+    if (message === 'pending') setError(PENDING_MESSAGE);
+    if (message === 'paused') setError(PAUSED_MESSAGE);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) window.location.href = '/';
+      if (session?.user && !message) window.location.href = '/';
     });
   }, []);
 
@@ -20,10 +27,28 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    const res = await fetch('/api/check-approval', {
+      headers: { Authorization: `Bearer ${data.session.access_token}` },
+    }).catch(() => null);
+    const status = res?.ok ? await res.json() : null;
+
+    if (!status || !status.isApproved || status.isPaused) {
+      await supabase.auth.signOut();
+      setError(
+        !status
+          ? 'Could not verify your account. Please try again.'
+          : status.isPaused
+            ? PAUSED_MESSAGE
+            : PENDING_MESSAGE
+      );
       setLoading(false);
       return;
     }
